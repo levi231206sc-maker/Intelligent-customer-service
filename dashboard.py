@@ -18,7 +18,7 @@ st.caption("AI-supported customer service operations dashboard")
 # LOAD DATA
 # =========================
 
-df = pd.read_excel("data/tickets.xlsx")
+df = pd.read_excel("tickets.xlsx")
 
 # =========================
 # KPI
