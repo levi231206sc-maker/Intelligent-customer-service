@@ -33,6 +33,7 @@ df = load_excel("tickets.xlsx")
 analysis_df = load_excel("tickets_analyzed.xlsx")
 routing_df = load_excel("test_routing.xlsx")
 rag_df = load_excel("test_rag.xlsx")
+classified_df = load_excel("Bản sao của classified_feedback.xlsx")
 
 # =========================
 # KPI
@@ -667,6 +668,22 @@ required_columns = [
     "sentiment",
     "urgency"
 ]
+
+missing_columns = [
+    col for col in required_columns
+    if col not in classified_df.columns
+]
+
+if missing_columns:
+    st.warning(
+        "The Excel file is missing these columns: "
+        + ", ".join(missing_columns)
+    )
+else:
+    # Dùng dữ liệu đúng từ classified_feedback.xlsx
+    df_classified = classified_df.copy()
+
+    # Tiếp tục phần bộ lọc Topic, Sentiment, Urgency
 
 missing_columns = [
     col for col in required_columns
