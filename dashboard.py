@@ -8,6 +8,167 @@ st.set_page_config(
 )
 
 # =========================
+# BANKING PROFESSIONAL THEME
+# =========================
+
+st.markdown("""
+<style>
+/* Main background and typography */
+.stApp {
+    background: #F3F6FB;
+    color: #172B4D;
+    font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(243, 246, 251, 0.95);
+}
+
+[data-testid="stMainBlockContainer"] {
+    max-width: 1440px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
+/* Main title */
+h1 {
+    color: #102744 !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.7px;
+}
+
+h2, h3 {
+    color: #173D67 !important;
+    font-weight: 700 !important;
+}
+
+/* Section dividers */
+hr {
+    border: none;
+    height: 1px;
+    background: #D9E3F0;
+    margin-top: 1.8rem;
+    margin-bottom: 1.8rem;
+}
+
+/* KPI cards */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #E0E8F2;
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: 0 3px 12px rgba(16, 39, 68, 0.045);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #64748B !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #102744 !important;
+    font-weight: 800 !important;
+}
+
+/* Data tables */
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    background: #FFFFFF;
+    border: 1px solid #DCE5F0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Inputs and dropdowns */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div {
+    background: #FFFFFF;
+    border-color: #CFDAE8;
+    border-radius: 9px;
+}
+
+div[data-baseweb="select"] > div:focus-within,
+div[data-baseweb="input"] > div:focus-within {
+    border-color: #3977B8;
+    box-shadow: 0 0 0 1px #3977B8;
+}
+
+/* Buttons */
+.stButton > button,
+.stDownloadButton > button {
+    border-radius: 9px;
+    min-height: 42px;
+    font-weight: 650;
+    border: 1px solid #C9D8E9;
+    transition: all 0.18s ease;
+}
+
+.stButton > button[kind="primary"],
+.stDownloadButton > button[kind="primary"] {
+    background: #173D67;
+    color: #FFFFFF;
+    border-color: #173D67;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    border-color: #3977B8;
+    color: #173D67;
+}
+
+/* Information and status messages */
+[data-testid="stAlert"] {
+    border-radius: 10px;
+    border: 1px solid #DCE5F0;
+}
+
+/* Text areas */
+textarea {
+    border-radius: 10px !important;
+    border-color: #CFDAE8 !important;
+    background: #FFFFFF !important;
+    line-height: 1.6 !important;
+}
+
+/* Expanders */
+[data-testid="stExpander"] {
+    background: #FFFFFF;
+    border: 1px solid #DCE5F0;
+    border-radius: 11px;
+    overflow: hidden;
+}
+
+[data-testid="stExpander"] summary {
+    color: #173D67;
+    font-weight: 600;
+}
+
+/* Charts and general containers */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #DCE5F0;
+    border-radius: 12px;
+}
+
+/* Captions */
+[data-testid="stCaptionContainer"] {
+    color: #718096;
+}
+
+/* Responsive spacing */
+@media (max-width: 768px) {
+    [data-testid="stMainBlockContainer"] {
+        padding: 1rem 1rem 2rem;
+    }
+
+    h1 {
+        font-size: 1.7rem !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
 # HEADER
 # =========================
 
