@@ -18,7 +18,21 @@ st.caption("AI-supported customer service operations dashboard")
 # LOAD DATA
 # =========================
 
-df = pd.read_excel("tickets.xlsx")
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+
+def load_excel(filename):
+    file_path = BASE_DIR / filename
+    if not file_path.exists():
+        st.error(f"Không tìm thấy file: {file_path}")
+        st.stop()
+    return pd.read_excel(file_path)
+
+df = load_excel("tickets.xlsx")
+analysis_df = load_excel("tickets_analyzed.xlsx")
+routing_df = load_excel("test_routing.xlsx")
+rag_df = load_excel("test_rag.xlsx")
 
 # =========================
 # KPI
@@ -155,99 +169,171 @@ with col3:
 st.markdown("### 🚨 Urgency")
 
 st.write(selected_row["is_urgent"])
+
 # =========================
 # AI ANALYSIS
 # =========================
 
 st.divider()
-
 st.subheader("🤖 AI Analysis")
 
-col1, col2 = st.columns(2)
+if "ticket_id" in analysis_df.columns and "ticket_id" in df.columns:
+    analysis_match = analysis_df[
+        analysis_df["ticket_id"].astype(str) == str(selected_ticket)
+    ]
 
-with col1:
-    st.write("**Intent**")
-    st.info("Not processed yet")
+    if not analysis_match.empty:
+        analysis_row = analysis_match.iloc[0]
 
-    st.write("**Topic**")
-    st.info("Not processed yet")
+        col1, col2 = st.columns(2)
 
-    st.write("**Product**")
-    st.info("Not processed yet")
+        with col1:
+            for field in ["intent", "topic", "product", "amount", "channel"]:
+                st.write(f"**{field.replace('_', ' ').title()}**")
+                st.info(str(analysis_row.get(field, "N/A")))
 
-    st.write("**Amount**")
-    st.info("Not processed yet")
+        with col2:
+            for field in [
+                "transaction_time",
+                "transaction_id",
+                "sentiment",
+                "missing_information"
+            ]:
+                st.write(f"**{field.replace('_', ' ').title()}**")
+                st.info(str(analysis_row.get(field, "N/A")))
 
-    st.write("**Channel**")
-    st.info("Not processed yet")
+    else:
+        st.warning("Không tìm thấy kết quả AI Analysis cho ticket này.")
+else:
+    st.warning("File AI Analysis chưa có cột ticket_id.")
 
-with col2:
-    st.write("**Transaction Time**")
-    st.info("Not processed yet")
-
-    st.write("**Transaction ID**")
-    st.info("Not processed yet")
-
-    st.write("**Sentiment**")
-    st.info("Not processed yet")
-
-    st.write("**Missing Information**")
-    st.info("Not processed yet")
 # =========================
 # PRIORITY & ROUTING
 # =========================
 
 st.divider()
-
 st.subheader("🚦 Priority & Routing")
 
-col1, col2 = st.columns(2)
+if not routing_df.empty:
+    if "test_id" in routing_df.columns:
+        test_options = routing_df["test_id"].dropna().astype(str).tolist()
+        selected_test = st.selectbox(
+            "Select Routing Test Case",
+            test_options,
+            key="routing_test_selector"
+        )
 
-with col1:
-    st.write("**Urgency**")
-    st.warning("Not processed yet")
+        routing_match = routing_df[
+            routing_df["test_id"].astype(str) == selected_test
+        ]
 
-    st.write("**Priority**")
-    st.warning("Not processed yet")
+        if not routing_match.empty:
+            routing_row = routing_match.iloc[0]
 
-with col2:
-    st.write("**Department**")
-    st.info("Not processed yet")
+            col1, col2 = st.columns(2)
 
-    st.write("**Routing Reason**")
-    st.info("Not processed yet")
+            with col1:
+                st.write("**Expected Priority**")
+                st.info(str(routing_row.get("expected_priority", "N/A")))
+
+                st.write("**Actual Priority**")
+                st.info(str(routing_row.get("actual_priority", "N/A")))
+
+                st.write("**Urgency**")
+                st.info(str(routing_row.get("urgency", "N/A")))
+
+            with col2:
+                st.write("**Expected Department**")
+                st.info(str(routing_row.get("expected_department", "N/A")))
+
+                st.write("**Actual Department**")
+                st.info(str(routing_row.get("actual_department", "N/A")))
+
+                st.write("**Routing Reason**")
+                st.info(str(routing_row.get("routing_reason", "N/A")))
+
+    st.markdown("### 📋 Routing Test Results")
+    st.dataframe(routing_df, use_container_width=True, hide_index=True)
+
+    if "both_correct" in routing_df.columns:
+        correct_count = (
+            routing_df["both_correct"].astype(str).str.lower()
+            .isin(["true", "1", "yes"])
+        ).sum()
+        st.metric("Test Cases with Correct Priority and Department",
+                  f"{correct_count}/{len(routing_df)}")
+else:
+    st.warning("File test_routing.xlsx không có dữ liệu.")
+
 # =========================
 # KNOWLEDGE BASE & RESPONSE
 # =========================
 
 st.divider()
+st.subheader("📚 Knowledge Base & RAG")
 
-st.subheader("📚 Knowledge Base")
+if not rag_df.empty:
+    if "test_id" in rag_df.columns:
+        rag_options = rag_df["test_id"].dropna().astype(str).tolist()
 
-col1, col2 = st.columns(2)
+        selected_rag_test = st.selectbox(
+            "Select RAG Test Case",
+            rag_options,
+            key="rag_test_selector"
+        )
 
-with col1:
-    st.write("**KB Found**")
-    st.info("Not processed yet")
+        rag_match = rag_df[
+            rag_df["test_id"].astype(str) == selected_rag_test
+        ]
 
-    st.write("**Source**")
-    st.info("Not processed yet")
+        if not rag_match.empty:
+            rag_row = rag_match.iloc[0]
 
-with col2:
-    st.write("**Confidence**")
-    st.info("Not processed yet")
+            st.markdown("### 💬 Customer Message")
+            st.write(rag_row.get("customer_message", "N/A"))
 
-    st.write("**Reason**")
-    st.info("Not processed yet")
+            col1, col2 = st.columns(2)
 
-st.markdown("### 📝 Draft Response")
+            with col1:
+                st.write("**Knowledge Base Found**")
+                st.info(str(rag_row.get("actual_kb_found", "N/A")))
 
-st.text_area(
-    "AI-generated draft",
-    value="Not processed yet",
-    height=150,
-    disabled=True
-)
+                st.write("**Source**")
+                st.info(str(rag_row.get("actual_source", "N/A")))
+
+                st.write("**Confidence**")
+                st.info(str(rag_row.get("actual_confidence", "N/A")))
+
+            with col2:
+                st.write("**Reason**")
+                st.info(str(rag_row.get("actual_reason", "N/A")))
+
+                st.write("**Expected FAQ Source**")
+                st.info(str(rag_row.get("expected_faq_source", "N/A")))
+
+                st.write("**Test Result**")
+                result = str(rag_row.get("test_result", "N/A"))
+                if result.upper() == "PASS":
+                    st.success(result)
+                elif result.upper() == "FAIL":
+                    st.error(result)
+                else:
+                    st.info(result)
+
+            st.markdown("### 📝 Draft Response")
+            st.text_area(
+                "AI-generated draft",
+                value=str(rag_row.get("actual_draft_response", "")),
+                height=150,
+                disabled=True,
+                key="rag_draft_response"
+            )
+
+    st.markdown("### 📋 All RAG Test Results")
+    st.dataframe(rag_df, use_container_width=True, hide_index=True)
+else:
+    st.warning("File test_rag.xlsx không có dữ liệu.")
+
 # =========================
 # HUMAN REVIEW
 # =========================
