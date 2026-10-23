@@ -1034,6 +1034,7 @@ st.caption(
     "Filter tickets by topic, sentiment, and urgency."
 )
 
+
 # Check whether the required columns exist
 required_columns = [
     "ticket_id",
@@ -1053,27 +1054,13 @@ if missing_columns:
         + ", ".join(missing_columns)
     )
 else:
-    # Dùng dữ liệu đúng từ classified_feedback.xlsx
     df_classified = classified_df.copy()
 
-    # Tiếp tục phần bộ lọc Topic, Sentiment, Urgency
-
-missing_columns = [
-    col for col in required_columns
-    if col not in df.columns
-]
-
-if missing_columns:
-    st.warning(
-        "The Excel file is missing these columns: "
-        + ", ".join(missing_columns)
-    )
-else:
     col1, col2, col3 = st.columns(3)
 
     with col1:
         topic_options = ["All"] + sorted(
-            df["topic"].dropna().astype(str).unique().tolist()
+            df_classified["topic"].dropna().astype(str).unique().tolist()
         )
         selected_topic = st.selectbox(
             "Filter by Topic",
@@ -1083,7 +1070,7 @@ else:
 
     with col2:
         sentiment_options = ["All"] + sorted(
-            df["sentiment"].dropna().astype(str).unique().tolist()
+            df_classified["sentiment"].dropna().astype(str).unique().tolist()
         )
         selected_sentiment = st.selectbox(
             "Filter by Sentiment",
@@ -1093,7 +1080,7 @@ else:
 
     with col3:
         urgency_options = ["All"] + sorted(
-            df["urgency"].dropna().astype(str).unique().tolist()
+            df_classified["urgency"].dropna().astype(str).unique().tolist()
         )
         selected_urgency = st.selectbox(
             "Filter by Urgency",
@@ -1101,34 +1088,32 @@ else:
             key="classified_urgency"
         )
 
-    classified_df = df.copy()
-
     if selected_topic != "All":
-        classified_df = classified_df[
-            classified_df["topic"].astype(str) == selected_topic
+        df_classified = df_classified[
+            df_classified["topic"].astype(str) == selected_topic
         ]
 
     if selected_sentiment != "All":
-        classified_df = classified_df[
-            classified_df["sentiment"].astype(str) == selected_sentiment
+        df_classified = df_classified[
+            df_classified["sentiment"].astype(str) == selected_sentiment
         ]
 
     if selected_urgency != "All":
-        classified_df = classified_df[
-            classified_df["urgency"].astype(str) == selected_urgency
+        df_classified = df_classified[
+            df_classified["urgency"].astype(str) == selected_urgency
         ]
 
-    st.metric("Matching Tickets", len(classified_df))
+    st.metric("Matching Tickets", len(df_classified))
 
     st.dataframe(
-        classified_df,
+        df_classified,
         use_container_width=True,
         hide_index=True
     )
 
     st.download_button(
         "📥 Download Filtered Tickets (CSV)",
-        data=classified_df.to_csv(index=False).encode("utf-8-sig"),
+        data=df_classified.to_csv(index=False).encode("utf-8-sig"),
         file_name="classified_tickets.csv",
         mime="text/csv"
     )
