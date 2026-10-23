@@ -172,8 +172,40 @@ textarea {
 # HEADER
 # =========================
 
-st.title("🏦 Intelligent Customer Service Operations")
-st.caption("AI-supported customer service operations dashboard")
+st.markdown("""
+<div style="
+    background: linear-gradient(120deg, #102744 0%, #1C4B78 100%);
+    padding: 30px 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 24px rgba(16,39,68,0.12);
+">
+    <div style="
+        color: #B9D8F7;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    ">
+        BANKING OPERATIONS PLATFORM
+    </div>
+    <div style="
+        color: white;
+        font-size: 30px;
+        font-weight: 800;
+        line-height: 1.3;
+    ">
+        🏦 Intelligent Customer Service
+    </div>
+    <div style="
+        color: #D8E6F5;
+        font-size: 15px;
+        margin-top: 10px;
+    ">
+        AI-supported customer service operations & management
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
 # LOAD DATA
