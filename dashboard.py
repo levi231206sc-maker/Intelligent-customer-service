@@ -957,36 +957,88 @@ st.caption(
     "Chưa có dữ liệu từng ngày đầy đủ để vẽ toàn bộ chuỗi thời gian."
 )
 
+# ============================================================
 # 5. ROOT-CAUSE HYPOTHESES
-st.subheader("6. Root-Cause Hypotheses to Verify")
+# ============================================================
 
-st.markdown("""
-- **Transfer:** Kiểm tra trạng thái giao dịch, thời gian đối soát
-  và thông tin người nhận. Đây là hướng điều tra, chưa phải kết luận.
-- **Card/Fraud:** Rà soát quy trình khóa thẻ, xác minh danh tính
-  và cảnh báo giao dịch. Không suy ra nguyên nhân chỉ từ topic.
-- **Negative/Urgent tickets:** Đối chiếu nhật ký hệ thống và hồ sơ
-  xử lý trước khi xác định nguyên nhân gốc rễ.
-""")
+st.subheader("5. Root-Cause Hypotheses")
 
+st.caption(
+    "Potential causes for investigation. "
+    "These hypotheses require operational evidence before confirmation."
+)
+
+root_col1, root_col2, root_col3 = st.columns(3)
+
+with root_col1:
+    st.markdown("**Transfer Issues**")
+    st.write(
+        "Review transaction status, reconciliation timing, "
+        "and recipient details to identify possible transfer issues."
+    )
+
+with root_col2:
+    st.markdown("**Card and Fraud Issues**")
+    st.write(
+        "Review card-blocking procedures, identity verification, "
+        "and transaction alerts for relevant cases."
+    )
+
+with root_col3:
+    st.markdown("**Negative or Urgent Tickets**")
+    st.write(
+        "Compare ticket records with system logs and handling history "
+        "before determining the underlying cause."
+    )
+
+st.info(
+    "Important: Ticket topic, sentiment, and urgency are indicators "
+    "for investigation. They do not independently establish root causes."
+)
+
+
+# ============================================================
 # 6. METHODOLOGY AND LIMITATIONS
-st.subheader("7. Methodology and Limitations")
+# ============================================================
+
+st.subheader("6. Methodology and Limitations")
 
 with st.expander("View methodology and limitations"):
-    st.markdown("""
-    1. Topic và sentiment được lấy từ file phân tích có sẵn;
-       không được dự đoán lại trong lần chạy này.
-    2. Cluster được tính độc lập từ nội dung bằng TF-IDF ký tự
-       và KMeans. Cluster phản ánh độ tương đồng văn bản,
-       không tự động chứng minh các ticket có cùng nguyên nhân.
-    3. Spike sử dụng quy tắc mean + 1.5 standard deviations
-       trên toàn bộ ngày trong khoảng thời gian, bao gồm ngày
-       không có ticket được tính là 0.
-    4. Các ngày vượt ngưỡng là tín hiệu để điều tra,
-       không phải bằng chứng nhân quả.
-    5. Giả thuyết nguyên nhân cần được xác minh bằng log giao dịch
-       và hồ sơ vận hành.
-    """)
+
+    st.markdown("**1. Topic and Sentiment Analysis**")
+    st.write(
+        "Topic and sentiment labels are taken from the existing "
+        "analysis output. They are not re-predicted in this report."
+    )
+
+    st.markdown("**2. Text Clustering**")
+    st.write(
+        "TF-IDF character features and KMeans are used to group "
+        "textually similar tickets. Similar wording does not prove "
+        "that tickets share the same underlying cause."
+    )
+
+    st.markdown("**3. Spike Detection**")
+    st.write(
+        "The reference threshold is calculated using the mean "
+        "plus 1.5 standard deviations across the reporting period. "
+        "Days with zero tickets are included in the calculation."
+    )
+
+    st.markdown("**4. Interpretation of Spikes**")
+    st.write(
+        "On 02/10/2026, 9 tickets were recorded; on 03/10/2026, "
+        "10 tickets were recorded. Both exceed the reference "
+        "threshold of 8.66 tickets per day. These are signals "
+        "for investigation, not evidence of causation."
+    )
+
+    st.markdown("**5. Data and Verification Limitations**")
+    st.write(
+        "The displayed trend covers only the two spike dates provided, "
+        "not a complete daily time series. Root causes must be verified "
+        "using transaction logs and operational records."
+    )
 # ============================================================
 # CLASSIFIED OUTPUT — FILTER AND VIEW TICKETS
 # ============================================================
