@@ -229,13 +229,36 @@ rag_df = load_excel("test_rag.xlsx")
 classified_df = load_excel("Copy of classified_feedback.xlsx")
 
 # =========================
-# KPI
+# DASHBOARD OVERVIEW
 # =========================
 
-col1, col2, col3 = st.columns(3)
+st.markdown("""
+<div style="margin: 8px 0 20px 0;">
+    <div style="
+        color: #173D67;
+        font-size: 23px;
+        font-weight: 750;
+        margin-bottom: 6px;
+    ">
+        Dashboard Overview
+    </div>
+    <div style="
+        color: #718096;
+        font-size: 14px;
+    ">
+        Tổng quan tình hình tiếp nhận và xử lý yêu cầu khách hàng
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
-    st.metric("Total Tickets", len(df))
+    st.metric(
+        label="🎫 Total Tickets",
+        value=len(df),
+        help="Tổng số ticket trong dữ liệu hiện có"
+    )
 
 with col2:
     if "is_urgent" in df.columns:
@@ -245,7 +268,11 @@ with col2:
     else:
         urgent_count = 0
 
-    st.metric("Urgent Tickets", urgent_count)
+    st.metric(
+        label="🚨 Urgent Tickets",
+        value=urgent_count,
+        help="Số ticket được đánh dấu khẩn cấp"
+    )
 
 with col3:
     if "category" in df.columns:
@@ -253,7 +280,15 @@ with col3:
     else:
         category_count = 0
 
-    st.metric("Categories", category_count)
+    st.metric(
+        label="📂 Categories",
+        value=category_count,
+        help="Số nhóm Category khác nhau trong dữ liệu"
+    )
+
+st.caption(
+    "Các chỉ số được tính trực tiếp từ dữ liệu ticket hiện có."
+)
 
 # =========================
 # TICKET LIST
