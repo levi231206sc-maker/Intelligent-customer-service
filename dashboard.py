@@ -957,43 +957,7 @@ st.caption(
     "Chưa có dữ liệu từng ngày đầy đủ để vẽ toàn bộ chuỗi thời gian."
 )
 
-# 5. REPRESENTATIVE CUSTOMER FEEDBACK
-st.subheader("5. Representative Complaints and Feedback")
-
-feedback_data = [
-    {
-        "Ticket ID": "T001",
-        "Topic": "card",
-        "Customer Message": (
-            "Mình làm mất ví, trong đó có thẻ ATM của ngân hàng. "
-            "Mình cần khóa thẻ gấp."
-        )
-    },
-    {
-        "Ticket ID": "T003",
-        "Topic": "transfer",
-        "Customer Message": (
-            "Mình lỡ nhập sai số tài khoản người nhận khi chuyển 2 triệu, "
-            "tiền đã đi rồi. Giờ làm sao lấy lại được?"
-        )
-    },
-    {
-        "Ticket ID": "T004",
-        "Topic": "transfer",
-        "Customer Message": (
-            "Mình bấm chuyển tiền nhưng chờ mãi không nhận được mã OTP "
-            "qua tin nhắn."
-        )
-    }
-]
-
-for feedback in feedback_data:
-    with st.expander(
-        f'{feedback["Ticket ID"]} | {feedback["Topic"]}'
-    ):
-        st.write(feedback["Customer Message"])
-
-# 6. ROOT-CAUSE HYPOTHESES
+# 5. ROOT-CAUSE HYPOTHESES
 st.subheader("6. Root-Cause Hypotheses to Verify")
 
 st.markdown("""
@@ -1005,7 +969,7 @@ st.markdown("""
   xử lý trước khi xác định nguyên nhân gốc rễ.
 """)
 
-# 7. METHODOLOGY AND LIMITATIONS
+# 6. METHODOLOGY AND LIMITATIONS
 st.subheader("7. Methodology and Limitations")
 
 with st.expander("View methodology and limitations"):
