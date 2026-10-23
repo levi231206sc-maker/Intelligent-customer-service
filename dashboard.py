@@ -11,158 +11,253 @@ st.set_page_config(
 # BANKING PROFESSIONAL THEME
 # =========================
 
+# =========================
+# MODERN SAAS + FINTECH THEME
+# =========================
+
 st.markdown("""
 <style>
-/* Main background and typography */
+/* ===== GLOBAL DESIGN ===== */
+:root {
+    --navy: #142D4E;
+    --blue: #3978C5;
+    --blue-light: #EAF2FC;
+    --page-bg: #F4F7FB;
+    --text: #25364B;
+    --muted: #718096;
+    --border: #E4EAF2;
+    --white: #FFFFFF;
+}
+
 .stApp {
-    background: #F3F6FB;
-    color: #172B4D;
+    background: var(--page-bg);
+    color: var(--text);
     font-family: "Inter", "Segoe UI", sans-serif;
 }
 
 [data-testid="stHeader"] {
-    background: rgba(243, 246, 251, 0.95);
+    background: rgba(244, 247, 251, 0.92);
 }
 
 [data-testid="stMainBlockContainer"] {
-    max-width: 1440px;
-    padding-top: 2rem;
-    padding-bottom: 3rem;
+    max-width: 1500px;
+    padding: 1.8rem 2.2rem 3rem;
 }
 
-/* Main title */
+/* ===== TYPOGRAPHY ===== */
+h1, h2, h3 {
+    color: var(--navy) !important;
+    letter-spacing: -0.45px;
+}
+
 h1 {
-    color: #102744 !important;
     font-weight: 800 !important;
-    letter-spacing: -0.7px;
 }
 
 h2, h3 {
-    color: #173D67 !important;
     font-weight: 700 !important;
 }
 
-/* Section dividers */
+p, label, .stMarkdown {
+    line-height: 1.65;
+}
+
+[data-testid="stCaptionContainer"] {
+    color: var(--muted);
+    font-size: 0.86rem;
+}
+
+/* ===== SECTION SPACING ===== */
 hr {
     border: none;
     height: 1px;
-    background: #D9E3F0;
-    margin-top: 1.8rem;
-    margin-bottom: 1.8rem;
+    background: var(--border);
+    margin: 2rem 0;
 }
 
-/* KPI cards */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: var(--border);
+    border-radius: 16px;
+}
+
+/* ===== KPI CARDS ===== */
 [data-testid="stMetric"] {
-    background: #FFFFFF;
-    border: 1px solid #E0E8F2;
-    border-radius: 14px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
     padding: 20px 22px;
-    box-shadow: 0 3px 12px rgba(16, 39, 68, 0.045);
+    box-shadow: 0 3px 10px rgba(20, 45, 78, 0.035);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(20, 45, 78, 0.075);
 }
 
 [data-testid="stMetricLabel"] {
-    color: #64748B !important;
-    font-size: 0.9rem !important;
+    color: var(--muted) !important;
+    font-size: 0.88rem !important;
     font-weight: 600 !important;
 }
 
 [data-testid="stMetricValue"] {
-    color: #102744 !important;
+    color: var(--navy) !important;
+    font-size: 1.8rem !important;
     font-weight: 800 !important;
 }
 
-/* Data tables */
+[data-testid="stMetricDelta"] {
+    font-size: 0.8rem;
+}
+
+/* ===== TABLES ===== */
 [data-testid="stDataFrame"],
 [data-testid="stTable"] {
-    background: #FFFFFF;
-    border: 1px solid #DCE5F0;
+    background: var(--white);
+    border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
 }
 
-/* Inputs and dropdowns */
+[data-testid="stDataFrame"] {
+    padding: 4px;
+}
+
+/* ===== INPUTS AND SELECTBOXES ===== */
 div[data-baseweb="select"] > div,
 div[data-baseweb="input"] > div {
-    background: #FFFFFF;
-    border-color: #CFDAE8;
-    border-radius: 9px;
+    background: var(--white);
+    border: 1px solid #D7E1ED;
+    border-radius: 10px;
+    min-height: 42px;
 }
 
 div[data-baseweb="select"] > div:focus-within,
 div[data-baseweb="input"] > div:focus-within {
-    border-color: #3977B8;
-    box-shadow: 0 0 0 1px #3977B8;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(57, 120, 197, 0.12);
 }
 
-/* Buttons */
+[data-testid="stTextInput"] label,
+[data-testid="stSelectbox"] label,
+[data-testid="stTextArea"] label {
+    color: var(--navy);
+    font-weight: 600;
+}
+
+/* ===== BUTTONS ===== */
 .stButton > button,
 .stDownloadButton > button {
-    border-radius: 9px;
+    border-radius: 10px;
     min-height: 42px;
+    padding: 0.5rem 1rem;
     font-weight: 650;
-    border: 1px solid #C9D8E9;
+    border: 1px solid #D7E1ED;
     transition: all 0.18s ease;
 }
 
 .stButton > button[kind="primary"],
 .stDownloadButton > button[kind="primary"] {
-    background: #173D67;
-    color: #FFFFFF;
-    border-color: #173D67;
+    background: var(--navy);
+    color: var(--white);
+    border-color: var(--navy);
 }
 
 .stButton > button:hover,
 .stDownloadButton > button:hover {
-    border-color: #3977B8;
-    color: #173D67;
+    border-color: var(--blue);
+    color: var(--blue);
 }
 
-/* Information and status messages */
+/* ===== ALERTS ===== */
 [data-testid="stAlert"] {
-    border-radius: 10px;
-    border: 1px solid #DCE5F0;
+    border-radius: 12px;
+    border: 1px solid var(--border);
 }
 
-/* Text areas */
+/* ===== TEXT AREAS ===== */
 textarea {
     border-radius: 10px !important;
-    border-color: #CFDAE8 !important;
-    background: #FFFFFF !important;
-    line-height: 1.6 !important;
+    border-color: #D7E1ED !important;
+    background: var(--white) !important;
+    line-height: 1.7 !important;
 }
 
-/* Expanders */
+/* ===== EXPANDERS ===== */
 [data-testid="stExpander"] {
-    background: #FFFFFF;
-    border: 1px solid #DCE5F0;
-    border-radius: 11px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
 }
 
 [data-testid="stExpander"] summary {
-    color: #173D67;
-    font-weight: 600;
+    color: var(--navy);
+    font-weight: 650;
 }
 
-/* Charts and general containers */
-[data-testid="stVerticalBlockBorderWrapper"] {
-    border-color: #DCE5F0;
-    border-radius: 12px;
+/* ===== CHART CONTAINERS ===== */
+[data-testid="stVegaLiteChart"],
+[data-testid="stArrowVegaLiteChart"],
+[data-testid="stPyplot"] {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
 }
 
-/* Captions */
-[data-testid="stCaptionContainer"] {
-    color: #718096;
+/* ===== SIDEBAR ===== */
+[data-testid="stSidebar"] {
+    background: #FFFFFF;
+    border-right: 1px solid var(--border);
 }
 
-/* Responsive spacing */
-@media (max-width: 768px) {
+[data-testid="stSidebar"] > div:first-child {
+    padding-top: 1.5rem;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: var(--navy) !important;
+}
+
+/* ===== LINKS AND CHECKBOXES ===== */
+a {
+    color: var(--blue);
+}
+
+[data-testid="stCheckbox"] label {
+    color: var(--text);
+}
+
+/* ===== RESPONSIVE LAYOUT ===== */
+@media (max-width: 900px) {
     [data-testid="stMainBlockContainer"] {
-        padding: 1rem 1rem 2rem;
+        padding: 1.2rem 1rem 2rem;
+    }
+
+    [data-testid="stMetric"] {
+        padding: 15px;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 1.45rem !important;
+    }
+}
+
+@media (max-width: 600px) {
+    [data-testid="stMainBlockContainer"] {
+        padding: 0.8rem 0.7rem 1.5rem;
     }
 
     h1 {
         font-size: 1.7rem !important;
+    }
+
+    h2 {
+        font-size: 1.35rem !important;
     }
 }
 </style>
@@ -172,37 +267,45 @@ textarea {
 # HEADER
 # =========================
 
+# =========================
+# MODERN APP HEADER
+# =========================
+
 st.markdown("""
 <div style="
-    background: linear-gradient(120deg, #102744 0%, #1C4B78 100%);
+    background: linear-gradient(125deg, #12243A 0%, #1B426B 65%, #285B8B 100%);
     padding: 30px 32px;
-    border-radius: 16px;
-    margin-bottom: 24px;
-    box-shadow: 0 8px 24px rgba(16,39,68,0.12);
+    border-radius: 18px;
+    margin-bottom: 26px;
+    box-shadow: 0 10px 28px rgba(20, 45, 78, 0.12);
+    position: relative;
+    overflow: hidden;
 ">
     <div style="
-        color: #B9D8F7;
-        font-size: 12px;
-        font-weight: 700;
+        color: #A9D0F5;
+        font-size: 11px;
+        font-weight: 750;
         letter-spacing: 2px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     ">
-        BANKING OPERATIONS PLATFORM
+        CUSTOMER OPERATIONS WORKSPACE
     </div>
     <div style="
-        color: white;
+        color: #FFFFFF;
         font-size: 30px;
         font-weight: 800;
         line-height: 1.3;
+        letter-spacing: -0.8px;
     ">
         🏦 Intelligent Customer Service
     </div>
     <div style="
-        color: #D8E6F5;
-        font-size: 15px;
+        color: #D7E6F5;
+        font-size: 14px;
         margin-top: 10px;
+        line-height: 1.7;
     ">
-        AI-supported customer service operations & management
+        AI-powered insights for smarter customer service operations
     </div>
 </div>
 """, unsafe_allow_html=True)
