@@ -533,7 +533,6 @@ else:
 # =========================
 
 st.divider()
-
 st.subheader("👤 Human Review")
 
 st.write("Review the AI-generated draft before taking action.")
@@ -541,13 +540,26 @@ st.write("Review the AI-generated draft before taking action.")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    edit_clicked = st.button("✏️ Edit", use_container_width=True)
+    edit_clicked = st.button(
+        "✏️ Edit",
+        use_container_width=True,
+        key="human_edit"
+    )
 
 with col2:
-    approve_clicked = st.button("✅ Approve", use_container_width=True)
+    approve_clicked = st.button(
+        "✅ Approve",
+        use_container_width=True,
+        type="primary",
+        key="human_approve"
+    )
 
 with col3:
-    escalate_clicked = st.button("⚠️ Escalate", use_container_width=True)
+    escalate_clicked = st.button(
+        "⚠️ Escalate",
+        use_container_width=True,
+        key="human_escalate"
+    )
 
 if edit_clicked:
     st.info("Edit mode selected. Human review is required.")
@@ -557,6 +569,7 @@ if approve_clicked:
 
 if escalate_clicked:
     st.warning("Ticket escalated for further review.")
+
 # =========================
 # MANAGEMENT DASHBOARD
 # =========================
