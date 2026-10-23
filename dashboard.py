@@ -611,7 +611,38 @@ if escalate_clicked:
 
 st.divider()
 
-st.header("📊 Management Dashboard")
+st.markdown("""
+<div style="
+    background: linear-gradient(120deg, #102744 0%, #1C4B78 100%);
+    padding: 24px 28px;
+    border-radius: 14px;
+    margin: 12px 0 24px 0;
+">
+    <div style="
+        color: #B9D8F7;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.8px;
+        margin-bottom: 8px;
+    ">
+        MANAGEMENT & ANALYTICS
+    </div>
+    <div style="
+        color: #FFFFFF;
+        font-size: 25px;
+        font-weight: 800;
+    ">
+        📊 Management Dashboard
+    </div>
+    <div style="
+        color: #D8E6F5;
+        font-size: 14px;
+        margin-top: 7px;
+    ">
+        Tổng quan hiệu suất, phân loại yêu cầu và xu hướng phản hồi khách hàng
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.subheader("📌 Overview")
 
