@@ -786,29 +786,28 @@ with col4:
 
     st.metric("Top Issue", top_category)
 
-
 # =========================
-# TOP ISSUES
-# =========================
-
-st.subheader("🔥 Top Issues")
-
-if "category" in df.columns:
-    category_counts = df["category"].value_counts()
-
-    st.bar_chart(category_counts)
-
-
-# =========================
-# TICKET TYPE
+# MANAGEMENT CHARTS
 # =========================
 
-st.subheader("📋 Ticket Type Distribution")
+chart_col1, chart_col2 = st.columns(2, gap="large")
 
-if "ticket_type" in df.columns:
-    ticket_type_counts = df["ticket_type"].value_counts()
+with chart_col1:
+    st.subheader("🔥 Top Customer Issues")
 
-    st.bar_chart(ticket_type_counts)
+    if "category" in df.columns:
+        category_counts = df["category"].value_counts()
+        st.bar_chart(category_counts)
+
+with chart_col2:
+    st.subheader("📋 Ticket Type Distribution")
+
+    if "ticket_type" in df.columns:
+        ticket_type_counts = df["ticket_type"].value_counts()
+        st.bar_chart(ticket_type_counts)
+
+st.divider()
+
 st.subheader("📈 Complaint Trend")
 
 if "created_at" in df.columns and "category" in df.columns:
@@ -824,7 +823,6 @@ if "created_at" in df.columns and "category" in df.columns:
     ]
 
     trend_df = trend_df.dropna(subset=["created_at"])
-
     trend_df["date"] = trend_df["created_at"].dt.date
 
     complaint_trend = trend_df.groupby("date").size()
