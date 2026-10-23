@@ -33,7 +33,7 @@ df = load_excel("tickets.xlsx")
 analysis_df = load_excel("tickets_analyzed.xlsx")
 routing_df = load_excel("test_routing.xlsx")
 rag_df = load_excel("test_rag.xlsx")
-classified_df = load_excel("Bản sao của classified_feedback.xlsx")
+classified_df = load_excel("Copy of classified_feedback.xlsx")
 
 # =========================
 # KPI
