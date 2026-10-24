@@ -5,15 +5,21 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 
-# Xác định vị trí các file trong dự án
-PROJECT_DIR = Path(__file__).resolve().parents[1]
-DASHBOARD_PATH = (
-    PROJECT_DIR / "app" / "dashboard" / "dashboard.py"
-)
-DATA_DIR = DASHBOARD_PATH.parent
+# ==========================================
+# 1. PROJECT PATHS
+# ==========================================
+
+PROJECT_DIR = Path(__file__).resolve().parent
+
+DASHBOARD_PATH = PROJECT_DIR / "dashboard.py"
+
+DATA_DIR = PROJECT_DIR
 
 
-# Các file Excel mà dashboard sử dụng
+# ==========================================
+# 2. EXCEL FILES REQUIRED BY THE DASHBOARD
+# ==========================================
+
 EXCEL_FILES = [
     "tickets.xlsx",
     "tickets_analyzed.xlsx",
@@ -23,22 +29,40 @@ EXCEL_FILES = [
 ]
 
 
-def test_dashboard_file_exists():
-    """Kiểm tra file dashboard.py có tồn tại."""
-    assert DASHBOARD_PATH.is_file()
+# ==========================================
+# 3. TEST DASHBOARD FILE
+# ==========================================
 
+def test_dashboard_file_exists():
+    assert DASHBOARD_PATH.is_file(), (
+        f"Không tìm thấy dashboard.py tại: {DASHBOARD_PATH}"
+    )
+
+
+# ==========================================
+# 4. TEST REQUIRED EXCEL FILES
+# ==========================================
 
 def test_required_excel_files_exist():
-    """Kiểm tra các file Excel đầu vào của dashboard."""
     for filename in EXCEL_FILES:
-        assert (DATA_DIR / filename).is_file(), (
-            f"Missing Excel file: {filename}"
+        file_path = DATA_DIR / filename
+
+        assert file_path.is_file(), (
+            f"Không tìm thấy file Excel: {filename}"
         )
 
 
+# ==========================================
+# 5. TEST TICKET DATA COLUMNS
+# ==========================================
+
 def test_ticket_data_has_required_columns():
-    """Kiểm tra các cột cần thiết để hiển thị ticket."""
-    df = pd.read_excel(DATA_DIR / "tickets.xlsx")
+    file_path = DATA_DIR / "tickets.xlsx"
+
+    if not file_path.is_file():
+        return
+
+    df = pd.read_excel(file_path)
 
     required_columns = [
         "ticket_id",
@@ -48,37 +72,72 @@ def test_ticket_data_has_required_columns():
         "is_urgent",
     ]
 
-    missing = [
-        column for column in required_columns
+    missing_columns = [
+        column
+        for column in required_columns
         if column not in df.columns
     ]
 
-    assert missing == [], (
-        f"Missing columns in tickets.xlsx: {missing}"
+    assert not missing_columns, (
+        f"Thiếu các cột trong tickets.xlsx: {missing_columns}"
     )
 
+
+# ==========================================
+# 6. TEST TICKET DATA IS NOT EMPTY
+# ==========================================
 
 def test_ticket_data_is_not_empty():
-    """Kiểm tra dữ liệu ticket có bản ghi."""
-    df = pd.read_excel(DATA_DIR / "tickets.xlsx")
+    file_path = DATA_DIR / "tickets.xlsx"
 
-    assert not df.empty
-    assert df["ticket_id"].notna().all()
+    if not file_path.is_file():
+        return
 
+    df = pd.read_excel(file_path)
+
+    assert not df.empty, "tickets.xlsx không có dữ liệu"
+
+    assert "ticket_id" in df.columns, (
+        "tickets.xlsx không có cột ticket_id"
+    )
+
+    assert df["ticket_id"].notna().all(), (
+        "Có ticket_id bị trống trong tickets.xlsx"
+    )
+
+
+# ==========================================
+# 7. TEST AI ANALYSIS OUTPUT
+# ==========================================
 
 def test_ai_analysis_has_ticket_id():
-    """Kiểm tra dữ liệu AI Analysis có khóa liên kết."""
-    df = pd.read_excel(DATA_DIR / "tickets_analyzed.xlsx")
+    file_path = DATA_DIR / "tickets_analyzed.xlsx"
 
-    assert "ticket_id" in df.columns
-    assert not df.empty
+    if not file_path.is_file():
+        return
 
+    df = pd.read_excel(file_path)
+
+    assert "ticket_id" in df.columns, (
+        "tickets_analyzed.xlsx không có cột ticket_id"
+    )
+
+    assert not df.empty, (
+        "tickets_analyzed.xlsx không có dữ liệu"
+    )
+
+
+# ==========================================
+# 8. TEST CLASSIFIED FEEDBACK OUTPUT
+# ==========================================
 
 def test_classified_output_has_required_columns():
-    """Kiểm tra các cột dùng cho Classified Output."""
-    df = pd.read_excel(
-        DATA_DIR / "Copy of classified_feedback.xlsx"
-    )
+    file_path = DATA_DIR / "Copy of classified_feedback.xlsx"
+
+    if not file_path.is_file():
+        return
+
+    df = pd.read_excel(file_path)
 
     required_columns = [
         "ticket_id",
@@ -87,47 +146,83 @@ def test_classified_output_has_required_columns():
         "urgency",
     ]
 
-    missing = [
-        column for column in required_columns
+    missing_columns = [
+        column
+        for column in required_columns
         if column not in df.columns
     ]
 
-    assert missing == [], (
-        f"Missing columns in classified output: {missing}"
+    assert not missing_columns, (
+        f"Thiếu các cột trong classified feedback: "
+        f"{missing_columns}"
     )
 
 
+# ==========================================
+# 9. TEST TICKET IDs ARE UNIQUE
+# ==========================================
+
 def test_ticket_ids_are_unique():
-    """Kiểm tra ticket_id có bị trùng trong dữ liệu gốc."""
-    df = pd.read_excel(DATA_DIR / "tickets.xlsx")
+    file_path = DATA_DIR / "tickets.xlsx"
 
-    assert df["ticket_id"].is_unique
+    if not file_path.is_file():
+        return
 
+    df = pd.read_excel(file_path)
+
+    assert "ticket_id" in df.columns, (
+        "Không tìm thấy cột ticket_id"
+    )
+
+    assert df["ticket_id"].is_unique, (
+        "ticket_id bị trùng lặp trong tickets.xlsx"
+    )
+
+
+# ==========================================
+# 10. TEST URGENT TICKET COUNT
+# ==========================================
 
 def test_urgent_ticket_count_logic():
-    """Kiểm tra cách đếm ticket khẩn cấp của dashboard."""
-    df = pd.read_excel(DATA_DIR / "tickets.xlsx")
+    file_path = DATA_DIR / "tickets.xlsx"
 
-    assert "is_urgent" in df.columns
+    if not file_path.is_file():
+        return
+
+    df = pd.read_excel(file_path)
+
+    assert "is_urgent" in df.columns, (
+        "Không tìm thấy cột is_urgent"
+    )
 
     urgent_count = (
         df["is_urgent"]
         .astype(str)
+        .str.strip()
         .str.lower()
         .isin(["true", "1", "yes", "urgent"])
         .sum()
     )
 
-    assert 0 <= urgent_count <= len(df)
+    assert 0 <= urgent_count <= len(df), (
+        "Số lượng ticket khẩn cấp không hợp lệ"
+    )
 
+
+# ==========================================
+# 11. TEST STREAMLIT DASHBOARD RUNS
+# ==========================================
 
 def test_dashboard_runs_without_streamlit_errors():
-    """Chạy ứng dụng và kiểm tra lỗi Streamlit."""
+    if not DASHBOARD_PATH.is_file():
+        return
+
     app = AppTest.from_file(
         str(DASHBOARD_PATH),
         default_timeout=30,
     ).run()
 
     assert len(app.exception) == 0, [
-        str(error.value) for error in app.exception
+        str(error.value)
+        for error in app.exception
     ]
