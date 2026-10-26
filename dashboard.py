@@ -1198,72 +1198,70 @@ elif page == "Management Analytics":
             )
 
     # -----------------------------------------------------
-    # 5. ROOT-CAUSE HYPOTHESES
+    # 5. ROOT-CAUSE HYPOTHESES AND LIMITATIONS
     # -----------------------------------------------------
     with st.expander(
-        "Root-cause hypotheses and analytical limitations",
+        "Nhận định nguyên nhân cần kiểm tra và giới hạn phân tích",
         expanded=False,
     ):
         st.markdown("""
-**Transfer**
+**Chuyển tiền (Transfer)**
 - Kiểm tra trạng thái giao dịch, thời gian đối soát và thông tin người nhận.
 
-**Card / Fraud**
+**Thẻ / Gian lận (Card / Fraud)**
 - Rà soát quy trình khóa thẻ, xác minh danh tính và cảnh báo giao dịch.
 
-**Negative sentiment / Urgent**
+**Cảm xúc tiêu cực / Ticket khẩn cấp**
 - Đối chiếu ticket với nhật ký hệ thống và lịch sử xử lý.
 
 ---
-Các nội dung trên là giả thuyết phục vụ điều tra, không phải kết luận nguyên nhân.
-Topic, sentiment và urgency chỉ là tín hiệu ban đầu; cần bằng chứng vận hành
-để xác minh.
+Đây là các hướng kiểm tra, không phải kết luận nguyên nhân. Topic, sentiment và
+urgency chỉ là tín hiệu ban đầu; cần bằng chứng vận hành để xác minh.
 """)
 
     # -----------------------------------------------------
-    # 6. SOURCE MANAGEMENT REPORT
+    # 6. EXISTING MANAGEMENT REPORT (OPTIONAL DETAIL)
     # -----------------------------------------------------
-    with st.expander("Open existing management summary report", expanded=False):
-        if management_report_text.strip():
+    if management_report_text.strip():
+        with st.expander("Xem báo cáo tóm tắt quản lý chi tiết", expanded=False):
             st.markdown(management_report_text)
-            st.caption(f"Nguồn: file báo cáo có sẵn · {management_report_path.name}. Đây không phải nội dung vừa được AI tạo trực tiếp trên trang này.")
-        else:
-            st.info(
-                "Chưa tìm thấy management_summary.md hoặc file đang trống. "
-                "Bạn có thể đặt file này cạnh dashboard.py hoặc trong thư mục data/."
+            st.caption(
+                f"Nguồn: {management_report_path.name}. Đây là báo cáo có sẵn, "
+                "không phải nội dung vừa được AI tạo trực tiếp trên trang này."
             )
 
     # -----------------------------------------------------
-    # 7. EXPORT MANAGEMENT SUMMARY
+    # 7. MANAGEMENT KPI REPORT + EXPORT
     # -----------------------------------------------------
-    st.markdown("")
-    st.markdown("### Management report")
-
+    st.markdown("### Báo cáo quản lý")
     st.caption(
-        "Xuất nhanh các chỉ số tổng hợp để phục vụ báo cáo và đối chiếu."
+        "Các chỉ số chính được hiển thị trực tiếp bên dưới. Bạn có thể tải CSV "
+        "để lưu trữ, đối chiếu hoặc tiếp tục xử lý bằng Excel."
     )
 
     summary = pd.DataFrame([
-        {"Metric": "Total tickets", "Value": total},
-        {"Metric": "Urgent tickets", "Value": urgent_count},
-        {"Metric": "Complaints", "Value": complaint_count},
-        {"Metric": "Negative sentiment", "Value": negative},
-        {"Metric": "Most common category", "Value": top_category},
+        {"Chỉ số": "Tổng số ticket", "Giá trị": total},
+        {"Chỉ số": "Ticket khẩn cấp", "Giá trị": urgent_count},
+        {"Chỉ số": "Ticket khiếu nại", "Giá trị": complaint_count},
+        {"Chỉ số": "Cảm xúc tiêu cực", "Giá trị": negative},
+        {"Chỉ số": "Chủ đề phổ biến nhất", "Giá trị": top_category},
     ])
 
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Tổng số ticket", f"{total:,}")
+    k2.metric("Ticket khẩn cấp", f"{urgent_count:,}")
+    k3.metric("Ticket khiếu nại", f"{complaint_count:,}")
+    k4.metric("Cảm xúc tiêu cực", f"{negative:,}")
+
     with st.container(border=True):
-        col_info, col_button = st.columns([3, 1])
-
-        with col_info:
-            st.markdown("**Management KPI snapshot**")
-            st.caption(
-                "Định dạng CSV · Có thể mở bằng Excel "
-                "để xem hoặc tiếp tục xử lý."
-            )
-
-        with col_button:
+        info_col, button_col = st.columns([3, 1])
+        with info_col:
+            st.markdown("**Chủ đề có nhiều ticket nhất**")
+            st.markdown(f"### {top_category}")
+            st.caption("Được xác định từ dữ liệu phân loại hiện có.")
+        with button_col:
             st.download_button(
-                "Download CSV",
+                "Tải xuống CSV",
                 summary.to_csv(index=False).encode("utf-8-sig"),
                 "management_summary.csv",
                 "text/csv",
@@ -1272,7 +1270,7 @@ Topic, sentiment và urgency chỉ là tín hiệu ban đầu; cần bằng ch�
 
     st.caption(
         "Lưu ý: Số liệu phụ thuộc vào dữ liệu đầu vào và kết quả phân loại. "
-        "Cần kiểm tra dữ liệu trước khi sử dụng trong báo cáo quản lý."
+        "Hãy kiểm tra dữ liệu trước khi sử dụng trong báo cáo chính thức."
     )
 
 # =========================================================
