@@ -226,90 +226,92 @@ if page == "Dashboard Overview":
     with q2:
         st.markdown("#### Ticket distribution")
         chart_col1, chart_col2 = st.columns(2)
-    with chart_col1:
-    st.caption("Tickets by category")
+   
+        with chart_col1:
+            st.caption("Tickets by category")
 
-    if "category" in tickets.columns:
-        category_counts = (
-            tickets["category"]
-            .fillna("Unknown")
-            .astype(str)
-            .value_counts()
-            .head(8)
-            .sort_values()
-            .rename_axis("Category")
-            .reset_index(name="Tickets")
-        )
+            if "category" in tickets.columns:
+                category_counts = (
+                    tickets["category"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .value_counts()
+                    .head(8)
+                    .sort_values()
+                    .rename_axis("Category")
+                    .reset_index(name="Tickets")
+                )
 
-        fig = px.bar(
-            category_counts,
-            x="Tickets",
-            y="Category",
-            orientation="h",
-            text="Tickets",
-            color_discrete_sequence=["#2F6FB2"],
-        )
+                fig1 = px.bar(
+                    category_counts,
+                    x="Tickets",
+                    y="Category",
+                    orientation="h",
+                    text="Tickets",
+                    color_discrete_sequence=["#2F6FB2"],
+                )
 
-        fig.update_layout(
-            height=350,
-            margin=dict(l=10, r=25, t=15, b=10),
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            yaxis_title="",
-            xaxis_title="Number of tickets",
-            showlegend=False,
-        )
+                fig1.update_layout(
+                    height=350,
+                    margin=dict(l=10, r=25, t=15, b=10),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    yaxis_title="",
+                    xaxis_title="Number of tickets",
+                    showlegend=False,
+                )
 
-        fig.update_traces(
-            textposition="outside",
-            cliponaxis=False,
-        )
+                fig1.update_traces(
+                    textposition="outside",
+                    cliponaxis=False,
+                )
 
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Không có cột category trong dữ liệu.")
-    with chart_col2:
-    st.caption("Tickets by type")
+                st.plotly_chart(fig1, use_container_width=True)
+            else:
+                st.info("Không có cột category trong dữ liệu.")
 
-    if "ticket_type" in tickets.columns:
-        type_counts = (
-            tickets["ticket_type"]
-            .fillna("Unknown")
-            .astype(str)
-            .value_counts()
-            .head(8)
-            .sort_values()
-            .rename_axis("Ticket Type")
-            .reset_index(name="Tickets")
-        )
+        with chart_col2:
+            st.caption("Tickets by type")
 
-        fig = px.bar(
-            type_counts,
-            x="Tickets",
-            y="Ticket Type",
-            orientation="h",
-            text="Tickets",
-            color_discrete_sequence=["#2F6FB2"],
-        )
+            if "ticket_type" in tickets.columns:
+                type_counts = (
+                    tickets["ticket_type"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .value_counts()
+                    .head(8)
+                    .sort_values()
+                    .rename_axis("Ticket Type")
+                    .reset_index(name="Tickets")
+                )
 
-        fig.update_layout(
-            height=350,
-            margin=dict(l=10, r=25, t=15, b=10),
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            yaxis_title="",
-            xaxis_title="Number of tickets",
-            showlegend=False,
-        )
+                fig2 = px.bar(
+                    type_counts,
+                    x="Tickets",
+                    y="Ticket Type",
+                    orientation="h",
+                    text="Tickets",
+                    color_discrete_sequence=["#2F6FB2"],
+                )
 
-        fig.update_traces(
-            textposition="outside",
-            cliponaxis=False,
-        )
+                fig2.update_layout(
+                    height=350,
+                    margin=dict(l=10, r=25, t=15, b=10),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    yaxis_title="",
+                    xaxis_title="Number of tickets",
+                    showlegend=False,
+                )
 
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Không có cột ticket_type trong dữ liệu.")
+                fig2.update_traces(
+                    textposition="outside",
+                    cliponaxis=False,
+                )
+
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("Không có cột ticket_type trong dữ liệu.")
 
     st.markdown("### Recent / urgent tickets")
     preview = tickets.copy()
