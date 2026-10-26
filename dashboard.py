@@ -848,67 +848,331 @@ elif page == "AI Analysis & Review":
         "cần kết nối database."
     )
 
+
 # =========================================================
 # PAGE 4: MANAGEMENT ANALYTICS
 # =========================================================
 elif page == "Management Analytics":
-    st.title("Management & Analytics")
-    st.markdown('<div class="section-note">Tổng hợp KPI, cơ cấu vấn đề, cảm xúc khách hàng và xu hướng khiếu nại.</div>', unsafe_allow_html=True)
+    st.title("Management Analytics")
+    st.markdown(
+        '<div class="section-note">'
+        'Tổng quan hiệu quả xử lý ticket, cảm xúc khách hàng '
+        'và xu hướng khiếu nại.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
+    # -----------------------------------------------------
+    # 1. PREPARE DATA
+    # -----------------------------------------------------
     total = len(tickets)
-    sentiment_series = col_series(tickets, "sentiment", "").astype(str).str.lower()
-    negative = int(sentiment_series.eq("negative").sum())
+
+    sentiment_series = (
+        col_series(tickets, "sentiment", "")
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    negative_labels = {
+        "negative", "neg", "negative sentiment",
+        "tiêu cực", "tieu cuc"
+    }
+    negative = int(sentiment_series.isin(negative_labels).sum())
+
     urgent_pct = urgent_count / max(total, 1) * 100
     negative_pct = negative / max(total, 1) * 100
+
+    # -----------------------------------------------------
+    # 2. KPI CARDS
+    # -----------------------------------------------------
+    st.markdown("### Performance overview")
+
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total tickets", f"{total:,}")
-    k2.metric("Urgent tickets", f"{urgent_count:,}", f"{urgent_pct:.1f}%")
-    k3.metric("Negative sentiment", f"{negative:,}", f"{negative_pct:.1f}%")
-    k4.metric("Most common category", top_category)
 
-    left, right = st.columns(2)
+    with k1:
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Total tickets
+                </div>
+                <div style="color:#17365D;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {total:,}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    All recorded tickets
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k2:
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #F2D5D3;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Urgent tickets
+                </div>
+                <div style="color:#C2413B;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {urgent_count:,}
+                </div>
+                <div style="color:#C2413B;font-size:12px;">
+                    {urgent_pct:.1f}% of all tickets
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k3:
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Negative sentiment
+                </div>
+                <div style="color:#17365D;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {negative:,}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    {negative_pct:.1f}% of all tickets
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k4:
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Most common category
+                </div>
+                <div style="color:#17365D;font-size:24px;
+                            font-weight:700;margin-top:12px;
+                            overflow-wrap:anywhere;">
+                    {top_category}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    Most frequent ticket category
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # -----------------------------------------------------
+    # 3. DISTRIBUTION CHARTS
+    # -----------------------------------------------------
+    st.markdown("")
+    st.markdown("### Ticket distribution")
+
+    left, right = st.columns(2, gap="large")
+
     with left:
-        st.markdown("### Topic distribution")
-        if "topic" in tickets.columns:
-            topic_counts = tickets["topic"].fillna("Unknown").astype(str).value_counts()
-            st.bar_chart(topic_counts.head(10))
-        elif not classified.empty and "topic" in classified.columns:
-            st.bar_chart(classified["topic"].fillna("Unknown").astype(str).value_counts().head(10))
-        else:
-            st.info("Không tìm thấy cột topic trong dữ liệu hiện có.")
+        with st.container(border=True):
+            st.markdown("#### Topics")
+            st.caption("Number of tickets by topic")
+
+            if "topic" in tickets.columns:
+                topic_counts = (
+                    tickets["topic"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .str.strip()
+                    .replace("", "Unknown")
+                    .value_counts()
+                    .head(10)
+                    .sort_values()
+                )
+
+                if not topic_counts.empty:
+                    st.bar_chart(
+                        topic_counts,
+                        horizontal=True,
+                        height=320,
+                        color="#3575B5",
+                    )
+                else:
+                    st.info("Chưa có dữ liệu topic.")
+            elif not classified.empty and "topic" in classified.columns:
+                topic_counts = (
+                    classified["topic"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .value_counts()
+                    .head(10)
+                    .sort_values()
+                )
+                st.bar_chart(
+                    topic_counts,
+                    horizontal=True,
+                    height=320,
+                    color="#3575B5",
+                )
+            else:
+                st.info("Không tìm thấy cột topic.")
+
     with right:
-        st.markdown("### Sentiment distribution")
-        if "sentiment" in tickets.columns:
-            st.bar_chart(tickets["sentiment"].fillna("Unknown").astype(str).value_counts())
-        elif "sentiment" in classified.columns:
-            st.bar_chart(classified["sentiment"].fillna("Unknown").astype(str).value_counts())
-        else:
-            st.info("Không tìm thấy cột sentiment trong dữ liệu hiện có.")
+        with st.container(border=True):
+            st.markdown("#### Customer sentiment")
+            st.caption("Distribution of customer sentiment")
 
+            sentiment_data = tickets.copy()
+
+            if "sentiment" not in sentiment_data.columns:
+                if not classified.empty and "sentiment" in classified.columns:
+                    sentiment_data = classified.copy()
+                else:
+                    sentiment_data = pd.DataFrame()
+
+            if (
+                not sentiment_data.empty
+                and "sentiment" in sentiment_data.columns
+            ):
+                sentiment_counts = (
+                    sentiment_data["sentiment"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .str.strip()
+                    .replace("", "Unknown")
+                    .value_counts()
+                )
+
+                st.bar_chart(
+                    sentiment_counts,
+                    height=320,
+                    color="#3575B5",
+                )
+            else:
+                st.info("Không tìm thấy dữ liệu sentiment.")
+
+    # -----------------------------------------------------
+    # 4. COMPLAINT TREND
+    # -----------------------------------------------------
+    st.markdown("")
     st.markdown("### Complaint trend")
-    if "created_at" in tickets.columns and "category" in tickets.columns:
-        trend = tickets.copy()
-        trend["created_at"] = pd.to_datetime(trend["created_at"], errors="coerce")
-        trend = trend[trend["category"].astype(str).str.lower().eq("complaint")].dropna(subset=["created_at"])
-        if not trend.empty:
-            trend["Date"] = trend["created_at"].dt.date
-            daily = trend.groupby("Date").size().rename("Complaints")
-            st.line_chart(daily)
+    st.caption("Daily number of tickets classified as complaints")
+
+    with st.container(border=True):
+        if "created_at" in tickets.columns and "category" in tickets.columns:
+            trend = tickets.copy()
+            trend["created_at"] = pd.to_datetime(
+                trend["created_at"],
+                errors="coerce",
+            )
+
+            category_values = (
+                trend["category"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+
+            trend = trend[
+                category_values.isin(
+                    {"complaint", "complaints", "khiếu nại", "khieu nai"}
+                )
+            ].dropna(subset=["created_at"])
+
+            if not trend.empty:
+                trend["Date"] = trend["created_at"].dt.normalize()
+
+                daily = (
+                    trend.groupby("Date")
+                    .size()
+                    .rename("Complaints")
+                    .to_frame()
+                )
+
+                st.line_chart(
+                    daily,
+                    height=280,
+                    color="#3575B5",
+                )
+                st.caption(
+                    f"Total complaints in the displayed period: "
+                    f"{len(trend):,}"
+                )
+            else:
+                st.info(
+                    "Không tìm thấy dữ liệu khiếu nại có ngày hợp lệ. "
+                    "Hãy kiểm tra giá trị trong cột category."
+                )
         else:
-            st.info("Chưa có dữ liệu ngày hợp lệ cho khiếu nại.")
-    else:
-        st.info("Cần có created_at và category để hiển thị xu hướng khiếu nại.")
+            st.info(
+                "Cần có hai cột created_at và category để hiển thị xu hướng."
+            )
 
-    with st.expander("Root-cause hypotheses and limitations"):
+    # -----------------------------------------------------
+    # 5. ROOT-CAUSE HYPOTHESES
+    # -----------------------------------------------------
+    with st.expander(
+        "Root-cause hypotheses and analytical limitations",
+        expanded=False,
+    ):
         st.markdown("""
-- **Transfer:** kiểm tra trạng thái giao dịch, thời gian đối soát và thông tin người nhận.
-- **Card/Fraud:** rà soát quy trình khóa thẻ, xác minh danh tính và cảnh báo giao dịch.
-- **Negative/Urgent:** đối chiếu ticket với log hệ thống và lịch sử xử lý.
+**Transfer**
+- Kiểm tra trạng thái giao dịch, thời gian đối soát và thông tin người nhận.
 
-Đây là các giả thuyết cần điều tra, không phải kết luận nguyên nhân. Topic, sentiment và urgency chỉ là tín hiệu; cần bằng chứng vận hành để xác nhận.
+**Card / Fraud**
+- Rà soát quy trình khóa thẻ, xác minh danh tính và cảnh báo giao dịch.
+
+**Negative sentiment / Urgent**
+- Đối chiếu ticket với nhật ký hệ thống và lịch sử xử lý.
+
+---
+Các nội dung trên là giả thuyết phục vụ điều tra, không phải kết luận nguyên nhân.
+Topic, sentiment và urgency chỉ là tín hiệu ban đầu; cần bằng chứng vận hành
+để xác minh.
 """)
 
-    st.markdown("### Export management snapshot")
+    # -----------------------------------------------------
+    # 6. EXPORT MANAGEMENT SUMMARY
+    # -----------------------------------------------------
+    st.markdown("")
+    st.markdown("### Management report")
+
+    st.caption(
+        "Xuất nhanh các chỉ số tổng hợp để phục vụ báo cáo và đối chiếu."
+    )
+
     summary = pd.DataFrame([
         {"Metric": "Total tickets", "Value": total},
         {"Metric": "Urgent tickets", "Value": urgent_count},
@@ -916,8 +1180,30 @@ elif page == "Management Analytics":
         {"Metric": "Negative sentiment", "Value": negative},
         {"Metric": "Most common category", "Value": top_category},
     ])
-    st.download_button("Download KPI summary (CSV)", summary.to_csv(index=False).encode("utf-8-sig"),
-                       "management_summary.csv", "text/csv")
+
+    with st.container(border=True):
+        col_info, col_button = st.columns([3, 1])
+
+        with col_info:
+            st.markdown("**Management KPI snapshot**")
+            st.caption(
+                "Định dạng CSV · Có thể mở bằng Excel "
+                "để xem hoặc tiếp tục xử lý."
+            )
+
+        with col_button:
+            st.download_button(
+                "Download CSV",
+                summary.to_csv(index=False).encode("utf-8-sig"),
+                "management_summary.csv",
+                "text/csv",
+                use_container_width=True,
+            )
+
+    st.caption(
+        "Lưu ý: Số liệu phụ thuộc vào dữ liệu đầu vào và kết quả phân loại. "
+        "Cần kiểm tra dữ liệu trước khi sử dụng trong báo cáo quản lý."
+    )
 
 # =========================================================
 # PAGE 5: CLASSIFIED OUTPUT
