@@ -335,25 +335,56 @@ if page == "Dashboard Overview":
         "Theo dõi danh sách ticket và ưu tiên kiểm tra các trường hợp khẩn cấp."
     )
 
-    # Chuẩn bị dữ liệu và nhận diện ticket khẩn cấp
-    preview = tickets.copy()
+    
+# Chuẩn bị dữ liệu và sắp xếp ticket
+preview = tickets.copy()
 
-    if "is_urgent" in preview.columns:
-        preview["_urgent_sort"] = (
-            norm_bool(preview["is_urgent"]).astype(int)
-        )
-        preview = preview.sort_values(
-            "_urgent_sort",
-            ascending=False,
-        )
+# Chuẩn hóa ngày tạo để sắp xếp đúng theo thời gian
+if "created_at" in preview.columns:
+    preview["created_at"] = pd.to_datetime(
+        preview["created_at"],
+        errors="coerce"
+    )
 
-        urgent_preview = preview[
-            preview["_urgent_sort"] == 1
-        ].drop(columns=["_urgent_sort"])
-    else:
-        urgent_preview = preview.iloc[0:0].copy()
+# Tạo cột phân loại mức độ khẩn cấp
+if "is_urgent" in preview.columns:
+    preview["_urgent_sort"] = (
+        norm_bool(preview["is_urgent"]).astype(int)
+    )
+else:
+    preview["_urgent_sort"] = 0
 
-    total_urgent = len(urgent_preview)
+# Sắp xếp: khẩn cấp trước, ngày mới nhất trước, mã ticket tăng dần
+sort_columns = ["_urgent_sort"]
+ascending_order = [False]
+
+if "created_at" in preview.columns:
+    sort_columns.append("created_at")
+    ascending_order.append(False)
+
+if "ticket_id" in preview.columns:
+    sort_columns.append("ticket_id")
+    ascending_order.append(True)
+
+preview = preview.sort_values(
+    by=sort_columns,
+    ascending=ascending_order,
+    na_position="last"
+).reset_index(drop=True)
+
+# Tạo danh sách riêng chỉ gồm ticket khẩn cấp
+urgent_preview = preview[
+    preview["_urgent_sort"] == 1
+].copy()
+
+# Đếm số ticket khẩn cấp
+total_urgent = len(urgent_preview)
+
+# Loại bỏ cột phụ trước khi hiển thị
+urgent_preview = urgent_preview.drop(
+    columns=["_urgent_sort"],
+    errors="ignore"
+)
 
     # Hai nút điều hướng
     action_col1, action_col2, action_col3 = st.columns(
