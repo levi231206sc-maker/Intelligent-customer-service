@@ -200,127 +200,240 @@ top_category = top_category.value_counts().index[0] if not top_category.empty el
 # =========================================================
 # PAGE 1: DASHBOARD
 # =========================================================
+
 if page == "Dashboard Overview":
     st.title("Dashboard Overview")
-    st.markdown('<div class="section-note">Tổng quan nhanh để xác định khối lượng công việc và những trường hợp cần ưu tiên.</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-note">'
+        'Tổng quan tình hình ticket, phân phối danh mục và các trường hợp cần ưu tiên xử lý.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
+    # =====================================================
+    # A. DASHBOARD OVERVIEW - KPI CARDS
+    # =====================================================
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("🎫 Total tickets", f"{len(tickets):,}")
-    c2.metric("🚨 Urgent tickets", f"{urgent_count:,}", f"{urgent_count / max(len(tickets),1):.1%} of total")
-    c3.metric("📣 Complaints", f"{complaint_count:,}")
-    c4.metric("🏷️ Most common category", top_category)
 
-    st.markdown("### Work queue")
-    q1, q2 = st.columns([1, 2])
-    with q1:
-        st.markdown("#### Priority action")
-        st.write("Mở danh sách các ticket đang được đánh dấu khẩn cấp để kiểm tra trước.")
-        if st.button("🚨 View urgent tickets", type="primary", use_container_width=True):
+    c1.metric("🎫 Total tickets", f"{len(tickets):,}")
+
+    c2.metric(
+        "🚨 Urgent tickets",
+        f"{urgent_count:,}",
+        f"{urgent_count / max(len(tickets), 1):.1%} of total",
+    )
+
+    c3.metric("📣 Complaints", f"{complaint_count:,}")
+    c4.metric("🏷️ Most common category", str(top_category))
+
+    st.divider()
+
+    # =====================================================
+    # C. TICKET DISTRIBUTION - CHARTS
+    # =====================================================
+    st.markdown("### Ticket Distribution")
+    st.caption(
+        "Thống kê số lượng ticket theo danh mục và loại ticket "
+        "để nhận diện các nhóm công việc nổi bật."
+    )
+
+    chart_col1, chart_col2 = st.columns(2)
+
+    with chart_col1:
+        st.markdown("#### Tickets by category")
+
+        if "category" in tickets.columns:
+            category_counts = (
+                tickets["category"]
+                .fillna("Unknown")
+                .astype(str)
+                .value_counts()
+                .head(8)
+                .sort_values()
+                .rename_axis("Category")
+                .reset_index(name="Tickets")
+            )
+
+            fig1 = px.bar(
+                category_counts,
+                x="Tickets",
+                y="Category",
+                orientation="h",
+                text="Tickets",
+                color_discrete_sequence=["#2F6FB2"],
+            )
+
+            fig1.update_layout(
+                height=320,
+                margin=dict(l=10, r=30, t=15, b=35),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                yaxis_title="",
+                xaxis_title="Number of tickets",
+                showlegend=False,
+            )
+
+            fig1.update_traces(
+                textposition="outside",
+                cliponaxis=False,
+            )
+
+            st.plotly_chart(fig1, use_container_width=True)
+        else:
+            st.info("Không tìm thấy cột category trong dữ liệu.")
+
+    with chart_col2:
+        st.markdown("#### Tickets by type")
+
+        if "ticket_type" in tickets.columns:
+            type_counts = (
+                tickets["ticket_type"]
+                .fillna("Unknown")
+                .astype(str)
+                .value_counts()
+                .head(8)
+                .sort_values()
+                .rename_axis("Ticket Type")
+                .reset_index(name="Tickets")
+            )
+
+            fig2 = px.bar(
+                type_counts,
+                x="Tickets",
+                y="Ticket Type",
+                orientation="h",
+                text="Tickets",
+                color_discrete_sequence=["#2F6FB2"],
+            )
+
+            fig2.update_layout(
+                height=320,
+                margin=dict(l=10, r=30, t=15, b=35),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                yaxis_title="",
+                xaxis_title="Number of tickets",
+                showlegend=False,
+            )
+
+            fig2.update_traces(
+                textposition="outside",
+                cliponaxis=False,
+            )
+
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("Không tìm thấy cột ticket_type trong dữ liệu.")
+
+    st.divider()
+
+    # =====================================================
+    # D. TICKET MANAGEMENT - PRIORITY ACTIONS + TICKET LIST
+    # =====================================================
+    st.markdown("### Ticket Management")
+    st.caption(
+        "Theo dõi danh sách ticket và ưu tiên kiểm tra các trường hợp khẩn cấp."
+    )
+
+    # Chuẩn bị dữ liệu và nhận diện ticket khẩn cấp
+    preview = tickets.copy()
+
+    if "is_urgent" in preview.columns:
+        preview["_urgent_sort"] = (
+            norm_bool(preview["is_urgent"]).astype(int)
+        )
+        preview = preview.sort_values(
+            "_urgent_sort",
+            ascending=False,
+        )
+
+        urgent_preview = preview[
+            preview["_urgent_sort"] == 1
+        ].drop(columns=["_urgent_sort"])
+    else:
+        urgent_preview = preview.iloc[0:0].copy()
+
+    total_urgent = len(urgent_preview)
+
+    # Hai nút điều hướng
+    action_col1, action_col2, action_col3 = st.columns(
+        [1.5, 1, 3]
+    )
+
+    with action_col1:
+        if st.button(
+            f"🚨 View urgent cases ({total_urgent})",
+            type="primary",
+            use_container_width=True,
+            key="dashboard_view_urgent",
+        ):
             st.session_state["ticket_urgent_only"] = True
             st.session_state["nav_target"] = "Ticket Management"
             st.rerun()
-        if st.button("📋 View all tickets", use_container_width=True):
+
+    with action_col2:
+        if st.button(
+            "📋 View all tickets",
+            use_container_width=True,
+            key="dashboard_view_all",
+        ):
             st.session_state["ticket_urgent_only"] = False
             st.session_state["nav_target"] = "Ticket Management"
             st.rerun()
-    with q2:
-        st.markdown("#### Ticket distribution")
-        chart_col1, chart_col2 = st.columns(2)
-   
-        with chart_col1:
-            st.caption("Tickets by category")
 
-            if "category" in tickets.columns:
-                category_counts = (
-                    tickets["category"]
-                    .fillna("Unknown")
-                    .astype(str)
-                    .value_counts()
-                    .head(8)
-                    .sort_values()
-                    .rename_axis("Category")
-                    .reset_index(name="Tickets")
-                )
+    with action_col3:
+        st.info(
+            f"Hiện có **{total_urgent} ticket khẩn cấp** "
+            "được đánh dấu trong dữ liệu."
+        )
 
-                fig1 = px.bar(
-                    category_counts,
-                    x="Tickets",
-                    y="Category",
-                    orientation="h",
-                    text="Tickets",
-                    color_discrete_sequence=["#2F6FB2"],
-                )
+    # Bảng ticket ngay trên Dashboard
+    st.markdown("#### Ticket list")
 
-                fig1.update_layout(
-                    height=350,
-                    margin=dict(l=10, r=25, t=15, b=10),
-                    plot_bgcolor="white",
-                    paper_bgcolor="white",
-                    yaxis_title="",
-                    xaxis_title="Number of tickets",
-                    showlegend=False,
-                )
+    # Mặc định hiển thị tất cả; có thể lọc ngay tại Dashboard
+    dashboard_filter = st.radio(
+        "Display tickets",
+        ["All tickets", "Urgent cases only"],
+        horizontal=True,
+        key="dashboard_ticket_filter",
+    )
 
-                fig1.update_traces(
-                    textposition="outside",
-                    cliponaxis=False,
-                )
+    if dashboard_filter == "Urgent cases only":
+        display_df = urgent_preview.copy()
+    else:
+        display_df = preview.drop(
+            columns=["_urgent_sort"],
+            errors="ignore",
+        ).copy()
 
-                st.plotly_chart(fig1, use_container_width=True)
-            else:
-                st.info("Không có cột category trong dữ liệu.")
+    # Sắp xếp để ticket khẩn cấp xuất hiện trước
+    preferred = [
+        "ticket_id",
+        "created_at",
+        "category",
+        "ticket_type",
+        "topic",
+        "sentiment",
+        "is_urgent",
+    ]
 
-        with chart_col2:
-            st.caption("Tickets by type")
+    visible_columns = [
+        col for col in preferred
+        if col in display_df.columns
+    ]
 
-            if "ticket_type" in tickets.columns:
-                type_counts = (
-                    tickets["ticket_type"]
-                    .fillna("Unknown")
-                    .astype(str)
-                    .value_counts()
-                    .head(8)
-                    .sort_values()
-                    .rename_axis("Ticket Type")
-                    .reset_index(name="Tickets")
-                )
+    st.caption(
+        f"Đang hiển thị {len(display_df):,} / {len(tickets):,} ticket."
+    )
 
-                fig2 = px.bar(
-                    type_counts,
-                    x="Tickets",
-                    y="Ticket Type",
-                    orientation="h",
-                    text="Tickets",
-                    color_discrete_sequence=["#2F6FB2"],
-                )
-
-                fig2.update_layout(
-                    height=350,
-                    margin=dict(l=10, r=25, t=15, b=10),
-                    plot_bgcolor="white",
-                    paper_bgcolor="white",
-                    yaxis_title="",
-                    xaxis_title="Number of tickets",
-                    showlegend=False,
-                )
-
-                fig2.update_traces(
-                    textposition="outside",
-                    cliponaxis=False,
-                )
-
-                st.plotly_chart(fig2, use_container_width=True)
-            else:
-                st.info("Không có cột ticket_type trong dữ liệu.")
-
-    st.markdown("### Recent / urgent tickets")
-    preview = tickets.copy()
-    if "is_urgent" in preview.columns:
-        preview["_urgent_sort"] = norm_bool(preview["is_urgent"]).astype(int)
-        preview = preview.sort_values("_urgent_sort", ascending=False).drop(columns="_urgent_sort")
-    preferred = [c for c in ["ticket_id", "created_at", "category", "ticket_type", "topic", "sentiment", "is_urgent"] if c in preview.columns]
-    st.dataframe(preview[preferred] if preferred else preview, use_container_width=True, hide_index=True)
-
+    st.dataframe(
+        display_df[visible_columns]
+        if visible_columns
+        else display_df,
+        use_container_width=True,
+        hide_index=True,
+    )
+ 
 # =========================================================
 # PAGE 2: TICKET MANAGEMENT
 # =========================================================
