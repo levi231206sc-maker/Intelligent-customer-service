@@ -511,7 +511,7 @@ elif page == "Ticket Management":
 
     search_col, cat_col, type_col, urgent_col = st.columns([2, 1, 1, 1])
     with search_col:
-        query = st.text_input("Search ticket", placeholder="Nhập ticket ID hoặc từ khóa trong nội dung...")
+        query = st.text_input("Tìm kiếm ticket", placeholder="Nhập mã ticket hoặc từ khóa trong nội dung...")
     with cat_col:
         cats = ["All"] + sorted(col_series(tickets, "category", "").dropna().astype(str).unique().tolist())
         category = st.selectbox("Category", cats)
@@ -549,20 +549,21 @@ elif page == "Ticket Management":
         default_id = st.session_state.get("selected_ticket_id", ids[0])
         if default_id not in ids:
             default_id = ids[0]
-        selected = st.selectbox("Open ticket details", ids, index=ids.index(default_id))
+        selected = st.selectbox("Chọn ticket để xem chi tiết", ids, index=ids.index(default_id))
         st.session_state["selected_ticket_id"] = selected
         row = filtered[filtered["ticket_id"].astype(str) == selected].iloc[0]
 
         st.divider()
-        st.subheader(f"Ticket detail · {selected}")
-        st.markdown("**Customer message**")
+        st.subheader(f"Chi tiết ticket · {selected}")
+        st.markdown("**Nội dung khách hàng**")
         st.info(safe_text(row.get("customer_message", "Không có nội dung khách hàng.")))
-        detail_cols = st.columns(4)
-        for i, field in enumerate(["category", "ticket_type", "is_urgent", "created_at"]):
+        # Keep Ticket Detail focused on information needed for case handling.
+        # cluster_label remains available in Classified Output, not in this detail card.
+        detail_fields = ["category", "ticket_type", "is_urgent", "created_at"]
+        detail_cols = st.columns(len(detail_fields))
+        for i, field in enumerate(detail_fields):
             with detail_cols[i]:
                 display_field(ticket_view, row, field)
-        with st.expander("View all original ticket fields"):
-            st.json({str(k): safe_text(v) for k, v in row.to_dict().items()})
     else:
         st.warning("Không có ticket nào khớp với bộ lọc.")
 
