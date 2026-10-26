@@ -738,8 +738,9 @@ elif page == "AI Analysis & Review":
             )
 
     st.markdown("#### AI Response Draft")
-
-    draft_key = f"draft_{selected}"
+    
+    # AI Draft thay đổi theo RAG test case được chọn
+    draft_key = f"draft_{chosen_rag if not rag.empty and 'test_id' in rag.columns and rag_ids else 'no_rag'}"
 
     if draft_key not in st.session_state:
         st.session_state[draft_key] = draft_default
