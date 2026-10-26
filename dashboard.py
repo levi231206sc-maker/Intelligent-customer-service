@@ -945,7 +945,7 @@ elif page == "AI Analysis & Review":
 # PAGE 4: MANAGEMENT ANALYTICS
 # =========================================================
 elif page == "Management Analytics":
-    st.title("Management Analytics")
+    st.title("Phân tích quản lý")
     st.markdown(
         '<div class="section-note">'
         'Tổng quan hiệu quả xử lý ticket, cảm xúc khách hàng '
@@ -975,7 +975,7 @@ elif page == "Management Analytics":
     # -----------------------------------------------------
     # 2. KPI CARDS
     # -----------------------------------------------------
-    st.markdown("### Performance overview")
+    st.markdown("### Tổng quan hiệu quả")
 
     k1, k2, k3, k4 = st.columns(4)
 
@@ -991,14 +991,14 @@ elif page == "Management Analytics":
                 box-shadow:0 2px 8px rgba(16,43,78,0.04);
             ">
                 <div style="color:#64748B;font-size:13px;">
-                    Total tickets
+                    Tổng số ticket
                 </div>
                 <div style="color:#17365D;font-size:30px;
                             font-weight:700;margin-top:8px;">
                     {total:,}
                 </div>
                 <div style="color:#64748B;font-size:12px;">
-                    All recorded tickets
+                    Tất cả ticket trong dữ liệu
                 </div>
             </div>
             """,
@@ -1017,7 +1017,7 @@ elif page == "Management Analytics":
                 box-shadow:0 2px 8px rgba(16,43,78,0.04);
             ">
                 <div style="color:#64748B;font-size:13px;">
-                    Urgent tickets
+                    Ticket khẩn cấp
                 </div>
                 <div style="color:#C2413B;font-size:30px;
                             font-weight:700;margin-top:8px;">
@@ -1043,7 +1043,7 @@ elif page == "Management Analytics":
                 box-shadow:0 2px 8px rgba(16,43,78,0.04);
             ">
                 <div style="color:#64748B;font-size:13px;">
-                    Negative sentiment
+                    Cảm xúc tiêu cực
                 </div>
                 <div style="color:#17365D;font-size:30px;
                             font-weight:700;margin-top:8px;">
@@ -1069,7 +1069,7 @@ elif page == "Management Analytics":
                 box-shadow:0 2px 8px rgba(16,43,78,0.04);
             ">
                 <div style="color:#64748B;font-size:13px;">
-                    Most common category
+                    Chủ đề phổ biến nhất
                 </div>
                 <div style="color:#17365D;font-size:24px;
                             font-weight:700;margin-top:12px;
@@ -1077,7 +1077,7 @@ elif page == "Management Analytics":
                     {top_category}
                 </div>
                 <div style="color:#64748B;font-size:12px;">
-                    Most frequent ticket category
+                    Chủ đề xuất hiện nhiều nhất
                 </div>
             </div>
             """,
@@ -1088,14 +1088,14 @@ elif page == "Management Analytics":
     # 3. DISTRIBUTION CHARTS
     # -----------------------------------------------------
     st.markdown("")
-    st.markdown("### Ticket distribution")
+    st.markdown("### Phân bố ticket")
 
     left, right = st.columns(2, gap="large")
 
     with left:
         with st.container(border=True):
-            st.markdown("#### Topics")
-            st.caption("Number of tickets by topic")
+            st.markdown("#### Chủ đề ticket")
+            st.caption("Số lượng ticket theo chủ đề")
 
             topic_frame = best_source_for("topic")
             if "topic" in topic_frame.columns and topic_frame["topic"].notna().any():
@@ -1112,8 +1112,8 @@ elif page == "Management Analytics":
 
     with right:
         with st.container(border=True):
-            st.markdown("#### Customer sentiment")
-            st.caption("Distribution of customer sentiment")
+            st.markdown("#### Cảm xúc khách hàng")
+            st.caption("Phân bố cảm xúc khách hàng")
 
             sentiment_data = best_source_for("sentiment").copy()
 
@@ -1142,8 +1142,8 @@ elif page == "Management Analytics":
     # 4. COMPLAINT TREND
     # -----------------------------------------------------
     st.markdown("")
-    st.markdown("### Complaint trend")
-    st.caption("Daily number of tickets classified as complaints")
+    st.markdown("### Xu hướng khiếu nại")
+    st.caption("Số ticket được phân loại là khiếu nại theo ngày")
 
     with st.container(border=True):
         trend_source = best_source_for("category")
@@ -1198,47 +1198,8 @@ elif page == "Management Analytics":
             )
 
     # -----------------------------------------------------
-    # 5. ROOT-CAUSE HYPOTHESES AND LIMITATIONS
+    # 5. EXPORT SUMMARY (without repeating KPI cards)
     # -----------------------------------------------------
-    with st.expander(
-        "Nhận định nguyên nhân cần kiểm tra và giới hạn phân tích",
-        expanded=False,
-    ):
-        st.markdown("""
-**Chuyển tiền (Transfer)**
-- Kiểm tra trạng thái giao dịch, thời gian đối soát và thông tin người nhận.
-
-**Thẻ / Gian lận (Card / Fraud)**
-- Rà soát quy trình khóa thẻ, xác minh danh tính và cảnh báo giao dịch.
-
-**Cảm xúc tiêu cực / Ticket khẩn cấp**
-- Đối chiếu ticket với nhật ký hệ thống và lịch sử xử lý.
-
----
-Đây là các hướng kiểm tra, không phải kết luận nguyên nhân. Topic, sentiment và
-urgency chỉ là tín hiệu ban đầu; cần bằng chứng vận hành để xác minh.
-""")
-
-    # -----------------------------------------------------
-    # 6. EXISTING MANAGEMENT REPORT (OPTIONAL DETAIL)
-    # -----------------------------------------------------
-    if management_report_text.strip():
-        with st.expander("Xem báo cáo tóm tắt quản lý chi tiết", expanded=False):
-            st.markdown(management_report_text)
-            st.caption(
-                f"Nguồn: {management_report_path.name}. Đây là báo cáo có sẵn, "
-                "không phải nội dung vừa được AI tạo trực tiếp trên trang này."
-            )
-
-    # -----------------------------------------------------
-    # 7. MANAGEMENT KPI REPORT + EXPORT
-    # -----------------------------------------------------
-    st.markdown("### Báo cáo quản lý")
-    st.caption(
-        "Các chỉ số chính được hiển thị trực tiếp bên dưới. Bạn có thể tải CSV "
-        "để lưu trữ, đối chiếu hoặc tiếp tục xử lý bằng Excel."
-    )
-
     summary = pd.DataFrame([
         {"Chỉ số": "Tổng số ticket", "Giá trị": total},
         {"Chỉ số": "Ticket khẩn cấp", "Giá trị": urgent_count},
@@ -1247,31 +1208,21 @@ urgency chỉ là tín hiệu ban đầu; cần bằng chứng vận hành để
         {"Chỉ số": "Chủ đề phổ biến nhất", "Giá trị": top_category},
     ])
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Tổng số ticket", f"{total:,}")
-    k2.metric("Ticket khẩn cấp", f"{urgent_count:,}")
-    k3.metric("Ticket khiếu nại", f"{complaint_count:,}")
-    k4.metric("Cảm xúc tiêu cực", f"{negative:,}")
+    export_col, note_col = st.columns([1, 3])
+    with export_col:
+        st.download_button(
+            "Tải báo cáo CSV",
+            summary.to_csv(index=False).encode("utf-8-sig"),
+            "management_summary.csv",
+            "text/csv",
+            use_container_width=True,
+        )
+    with note_col:
+        st.caption(
+            "Xuất nhanh các chỉ số đang hiển thị để lưu trữ hoặc mở bằng Excel. "
+            "Báo cáo chi tiết có thể được lưu riêng trong hồ sơ dự án."
+        )
 
-    with st.container(border=True):
-        info_col, button_col = st.columns([3, 1])
-        with info_col:
-            st.markdown("**Chủ đề có nhiều ticket nhất**")
-            st.markdown(f"### {top_category}")
-            st.caption("Được xác định từ dữ liệu phân loại hiện có.")
-        with button_col:
-            st.download_button(
-                "Tải xuống CSV",
-                summary.to_csv(index=False).encode("utf-8-sig"),
-                "management_summary.csv",
-                "text/csv",
-                use_container_width=True,
-            )
-
-    st.caption(
-        "Lưu ý: Số liệu phụ thuộc vào dữ liệu đầu vào và kết quả phân loại. "
-        "Hãy kiểm tra dữ liệu trước khi sử dụng trong báo cáo chính thức."
-    )
 
 # =========================================================
 # PAGE 5: CLASSIFIED OUTPUT
