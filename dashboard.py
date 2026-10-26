@@ -313,6 +313,11 @@ complaint_count = int(
         ["complaint", "complaints", "khiếu nại", "khieu nai"]
     ).sum()
 )
+# Number of distinct category labels, not the number of complaint tickets.
+valid_categories_global = category_series[
+    ~category_series.str.lower().isin(["", "nan", "none", "unknown"])
+]
+category_count = int(valid_categories_global.nunique())
 
 sentiment_source = best_source_for("sentiment")
 sentiment_global = normalize_sentiment(
@@ -436,19 +441,14 @@ if page == "Dashboard Overview":
         "Theo dõi nhanh khối lượng ticket, mức độ ưu tiên và các nhóm yêu cầu nổi bật."
     )
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.metric("🎫 Total Tickets", f"{total:,}")
     c2.metric(
         "🚨 Urgent Tickets",
         f"{urgent_count:,}",
         f"{urgent_count / max(total, 1):.1%} of total",
     )
-    c3.metric("📣 Complaints", f"{complaint_count:,}")
-    c4.metric(
-        "🏷️ Top Topic",
-        top_topic,
-        f"{top_topic_count:,} tickets ({top_topic_pct:.1f}%)",
-    )
+    c3.metric("🏷️ Categories", f"{category_count:,}", "Unique category groups")
 
     st.divider()
     st.markdown("### Ticket Distribution")
@@ -868,7 +868,7 @@ elif page == "Management Analytics":
     k1.metric("Total Tickets", f"{total:,}")
     k2.metric("Urgent Tickets", f"{urgent_count:,}", f"{urgent_pct:.1f}% of source")
     k3.metric("Complaints", f"{complaint_count:,}")
-    k4.metric("Top Topic", top_topic, f"{top_topic_count:,} tickets · {top_topic_pct:.1f}%")
+    k4.metric("Categories", f"{category_count:,}", "Unique category groups")
 
     sentiment_cols = st.columns(3)
     sentiment_cols[0].metric("😊 Positive", f"{positive:,}", f"{positive_pct:.1f}%")
@@ -911,10 +911,6 @@ elif page == "Management Analytics":
         )
         fig_topic.update_traces(textposition="outside", cliponaxis=False)
         st.plotly_chart(fig_topic, use_container_width=True)
-        st.caption(
-            "Top Topic được xác định bằng cách chọn topic có số ticket cao nhất "
-            "trong các bản ghi có topic hợp lệ."
-        )
     else:
         st.info("Không tìm thấy dữ liệu topic hợp lệ.")
 
