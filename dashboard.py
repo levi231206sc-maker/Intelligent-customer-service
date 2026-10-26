@@ -23,6 +23,7 @@ FILES = {
     "routing": ["test_routing.xlsx", "test_routing_results.xlsx"],
     "rag": ["test_rag.xlsx", "rag_results.xlsx"],
     "classified": ["Copy of classified_feedback.xlsx", "classified_feedback.xlsx", "tickets_analyzed.xlsx"],
+    "management_report": ["management_summary.md"],
 }
 
 # =========================================================
@@ -109,6 +110,22 @@ analysis, analysis_path = load_table("analysis")
 routing, routing_path = load_table("routing")
 rag, rag_path = load_table("rag")
 classified, classified_path = load_table("classified")
+management_report_path = find_file(FILES["management_report"])
+
+def read_management_report(path):
+    if path is None:
+        return ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        try:
+            return path.read_text(encoding="utf-8-sig")
+        except Exception:
+            return ""
+    except Exception:
+        return ""
+
+management_report_text = read_management_report(management_report_path)
 
 def norm_bool(series):
     return series.astype(str).str.strip().str.lower().isin(["true", "1", "yes", "urgent", "high", "khẩn cấp"])
@@ -170,6 +187,9 @@ with st.sidebar:
             st.markdown(f"**{label}:** {len(frame):,} rows")
         else:
             st.markdown(f"**{label}:** chưa tìm thấy")
+    st.markdown(
+        f"**Management report:** {'đã tìm thấy' if management_report_path else 'chưa tìm thấy'}"
+    )
 
 # =========================================================
 # HEADER
@@ -190,12 +210,34 @@ if tickets.empty:
     st.stop()
 
 # Derived ticket fields
-urgent_mask = norm_bool(col_series(tickets, "is_urgent", "false"))
+# Prefer the detailed classified output when it contains the relevant analysis fields;
+# otherwise fall back to the original tickets table.
+def best_source_for(field):
+    for frame in (classified, analysis, tickets):
+        if not frame.empty and field in frame.columns and frame[field].notna().any():
+            return frame
+    return tickets
+
+urgent_source = best_source_for("is_urgent")
+urgent_mask = norm_bool(col_series(urgent_source, "is_urgent", "false"))
 urgent_count = int(urgent_mask.sum())
-complaint_count = int(col_series(tickets, "category", "").astype(str).str.lower().eq("complaint").sum())
-negative_count = int(col_series(tickets, "sentiment", "").astype(str).str.lower().eq("negative").sum())
-top_category = col_series(tickets, "category", "").dropna().astype(str)
-top_category = top_category.value_counts().index[0] if not top_category.empty else "N/A"
+
+category_source = best_source_for("category")
+category_series = col_series(category_source, "category", "").fillna("").astype(str).str.strip()
+complaint_count = int(category_series.str.lower().isin(
+    ["complaint", "complaints", "khiếu nại", "khieu nai"]
+).sum())
+
+sentiment_source = best_source_for("sentiment")
+sentiment_series_global = (
+    col_series(sentiment_source, "sentiment", "")
+    .fillna("").astype(str).str.strip().str.lower()
+)
+negative_labels_global = {"negative", "neg", "negative sentiment", "tiêu cực", "tieu cuc"}
+negative_count = int(sentiment_series_global.isin(negative_labels_global).sum())
+
+top_category = category_series[category_series.ne("")].value_counts()
+top_category = top_category.index[0] if not top_category.empty else "N/A"
 
 # =========================================================
 # PAGE 1: DASHBOARD
@@ -866,23 +908,18 @@ elif page == "Management Analytics":
     # 1. PREPARE DATA
     # -----------------------------------------------------
     total = len(tickets)
-
+    # KPIs use the best available analyzed source, not only the original ticket file.
+    sentiment_frame = best_source_for("sentiment")
     sentiment_series = (
-        col_series(tickets, "sentiment", "")
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .str.lower()
+        col_series(sentiment_frame, "sentiment", "")
+        .fillna("").astype(str).str.strip().str.lower()
     )
-
-    negative_labels = {
-        "negative", "neg", "negative sentiment",
-        "tiêu cực", "tieu cuc"
-    }
+    negative_labels = {"negative", "neg", "negative sentiment", "tiêu cực", "tieu cuc"}
     negative = int(sentiment_series.isin(negative_labels).sum())
+    negative_denominator = max(len(sentiment_frame), 1)
 
-    urgent_pct = urgent_count / max(total, 1) * 100
-    negative_pct = negative / max(total, 1) * 100
+    urgent_pct = urgent_count / max(len(urgent_source), 1) * 100
+    negative_pct = negative / negative_denominator * 100
 
     # -----------------------------------------------------
     # 2. KPI CARDS
@@ -1009,44 +1046,18 @@ elif page == "Management Analytics":
             st.markdown("#### Topics")
             st.caption("Number of tickets by topic")
 
-            if "topic" in tickets.columns:
+            topic_frame = best_source_for("topic")
+            if "topic" in topic_frame.columns and topic_frame["topic"].notna().any():
                 topic_counts = (
-                    tickets["topic"]
-                    .fillna("Unknown")
-                    .astype(str)
-                    .str.strip()
-                    .replace("", "Unknown")
-                    .value_counts()
-                    .head(10)
-                    .sort_values()
-                )
-
-                if not topic_counts.empty:
-                    st.bar_chart(
-                        topic_counts,
-                        horizontal=True,
-                        height=320,
-                        color="#3575B5",
-                    )
-                else:
-                    st.info("Chưa có dữ liệu topic.")
-            elif not classified.empty and "topic" in classified.columns:
-                topic_counts = (
-                    classified["topic"]
-                    .fillna("Unknown")
-                    .astype(str)
-                    .value_counts()
-                    .head(10)
-                    .sort_values()
+                    topic_frame["topic"].fillna("Unknown").astype(str)
+                    .str.strip().replace("", "Unknown").value_counts()
+                    .head(10).sort_values()
                 )
                 st.bar_chart(
-                    topic_counts,
-                    horizontal=True,
-                    height=320,
-                    color="#3575B5",
+                    topic_counts, horizontal=True, height=320, color="#3575B5"
                 )
             else:
-                st.info("Không tìm thấy cột topic.")
+                st.info("Không tìm thấy dữ liệu topic trong các file hiện có.")
 
     with right:
         with st.container(border=True):
@@ -1090,8 +1101,9 @@ elif page == "Management Analytics":
     st.caption("Daily number of tickets classified as complaints")
 
     with st.container(border=True):
-        if "created_at" in tickets.columns and "category" in tickets.columns:
-            trend = tickets.copy()
+        trend_source = best_source_for("category")
+        if "created_at" in trend_source.columns and "category" in trend_source.columns:
+            trend = trend_source.copy()
             trend["created_at"] = pd.to_datetime(
                 trend["created_at"],
                 errors="coerce",
@@ -1164,7 +1176,20 @@ Topic, sentiment và urgency chỉ là tín hiệu ban đầu; cần bằng ch�
 """)
 
     # -----------------------------------------------------
-    # 6. EXPORT MANAGEMENT SUMMARY
+    # 6. SOURCE MANAGEMENT REPORT
+    # -----------------------------------------------------
+    with st.expander("View management_summary.md source report", expanded=False):
+        if management_report_text.strip():
+            st.markdown(management_report_text)
+            st.caption(f"Source file: {management_report_path.name}")
+        else:
+            st.info(
+                "Chưa tìm thấy management_summary.md hoặc file đang trống. "
+                "Bạn có thể đặt file này cạnh dashboard.py hoặc trong thư mục data/."
+            )
+
+    # -----------------------------------------------------
+    # 7. EXPORT MANAGEMENT SUMMARY
     # -----------------------------------------------------
     st.markdown("")
     st.markdown("### Management report")
@@ -1216,6 +1241,15 @@ elif page == "Classified Output":
     if source.empty:
         st.warning("Không có dữ liệu Classified Output để hiển thị.")
         st.stop()
+
+    if "ticket_id" in source.columns:
+        source["_sort_ticket_number"] = pd.to_numeric(
+            source["ticket_id"].astype(str).str.extract(r"(\\d+)", expand=False),
+            errors="coerce",
+        )
+        source = source.sort_values("_sort_ticket_number", na_position="last").drop(
+            columns=["_sort_ticket_number"]
+        )
 
     filter_fields = [f for f in ["topic", "sentiment", "urgency", "category", "is_urgent"] if f in source.columns]
     filter_cols = st.columns(min(max(len(filter_fields), 1), 4))
