@@ -159,6 +159,11 @@ def to_excel_bytes(frame):
 # =========================================================
 # SIDEBAR NAVIGATION
 # =========================================================
+# Apply navigation requests before creating the sidebar radio widget.
+if st.session_state.pop("_navigate_urgent_queue", False):
+    st.session_state["page_navigation"] = "Ticket Management"
+    st.session_state["ticket_urgent_only"] = True
+
 with st.sidebar:
     st.markdown("## 🏦 Intelligent CS")
     st.caption("Customer Operations Workspace")
@@ -173,6 +178,7 @@ with st.sidebar:
             "Classified Output",
         ],
         label_visibility="visible",
+        key="page_navigation",
     )
     st.divider()
     st.caption("DATA STATUS")
@@ -209,18 +215,51 @@ if tickets.empty:
     )
     st.stop()
 
-# Derived ticket fields
-# Prefer the detailed classified output when it contains the relevant analysis fields;
-# otherwise fall back to the original tickets table.
+# =========================================================
+# DATA SOURCE PRIORITY AND CONSISTENT TICKET VIEW
+# =========================================================
+# Classified Output is the preferred source for analyzed fields.
+# Original tickets remain the source for the customer's original message.
 def best_source_for(field):
     for frame in (classified, analysis, tickets):
         if not frame.empty and field in frame.columns and frame[field].notna().any():
-            return frame
+            values = frame[field].astype(str).str.strip()
+            if values.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA}).notna().any():
+                return frame
     return tickets
 
+def build_ticket_view(base, *sources):
+    """Enrich original ticket rows with analyzed fields by ticket_id, without duplicating rows."""
+    if base.empty or "ticket_id" not in base.columns:
+        return base.copy()
+    result = base.copy()
+    result["ticket_id"] = result["ticket_id"].astype(str)
+    for source in sources:
+        if source.empty or "ticket_id" not in source.columns:
+            continue
+        extra = source.copy()
+        extra["ticket_id"] = extra["ticket_id"].astype(str)
+        extra = extra.drop_duplicates(subset=["ticket_id"], keep="first")
+        extra = extra.set_index("ticket_id")
+        for col in extra.columns:
+            if col not in result.columns:
+                result[col] = result["ticket_id"].map(extra[col])
+            else:
+                existing = result[col]
+                blank = existing.isna() | existing.astype(str).str.strip().isin(["", "nan", "None"])
+                mapped = result["ticket_id"].map(extra[col])
+                result.loc[blank, col] = mapped.loc[blank]
+    return result
+
+ticket_view = build_ticket_view(tickets, analysis, classified)
+
+# Use classified rows for analyzed metrics when available; fall back only when necessary.
+metrics_source = classified if not classified.empty else (analysis if not analysis.empty else tickets)
+total = len(metrics_source) if not metrics_source.empty else len(tickets)
+
 urgent_source = best_source_for("is_urgent")
-urgent_mask = norm_bool(col_series(urgent_source, "is_urgent", "false"))
-urgent_count = int(urgent_mask.sum())
+urgent_mask_global = norm_bool(col_series(urgent_source, "is_urgent", "false"))
+urgent_count = int(urgent_mask_global.sum())
 
 category_source = best_source_for("category")
 category_series = col_series(category_source, "category", "").fillna("").astype(str).str.strip()
@@ -236,8 +275,8 @@ sentiment_series_global = (
 negative_labels_global = {"negative", "neg", "negative sentiment", "tiêu cực", "tieu cuc"}
 negative_count = int(sentiment_series_global.isin(negative_labels_global).sum())
 
-top_category = category_series[category_series.ne("")].value_counts()
-top_category = top_category.index[0] if not top_category.empty else "N/A"
+top_category_counts = category_series[category_series.ne("")].value_counts()
+top_category = top_category_counts.index[0] if not top_category_counts.empty else "N/A"
 
 # =========================================================
 # PAGE 1: DASHBOARD
@@ -257,12 +296,12 @@ if page == "Dashboard Overview":
     # =====================================================
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric("🎫 Total tickets", f"{len(tickets):,}")
+    c1.metric("🎫 Total tickets", f"{total:,}")
 
     c2.metric(
         "🚨 Urgent tickets",
         f"{urgent_count:,}",
-        f"{urgent_count / max(len(tickets), 1):.1%} of total",
+        f"{urgent_count / max(total, 1):.1%} of total",
     )
 
     c3.metric("📣 Complaints", f"{complaint_count:,}")
@@ -284,9 +323,10 @@ if page == "Dashboard Overview":
     with chart_col1:
         st.markdown("#### Tickets by category")
 
-        if "category" in tickets.columns:
+        chart_source = best_source_for("category")
+        if "category" in chart_source.columns:
             category_counts = (
-                tickets["category"]
+                chart_source["category"]
                 .fillna("Unknown")
                 .astype(str)
                 .value_counts()
@@ -327,9 +367,10 @@ if page == "Dashboard Overview":
     with chart_col2:
         st.markdown("#### Tickets by type")
 
-        if "ticket_type" in tickets.columns:
+        type_source = best_source_for("ticket_type")
+        if "ticket_type" in type_source.columns:
             type_counts = (
-                tickets["ticket_type"]
+                type_source["ticket_type"]
                 .fillna("Unknown")
                 .astype(str)
                 .value_counts()
@@ -376,9 +417,16 @@ if page == "Dashboard Overview":
     st.caption(
         "Theo dõi danh sách ticket và ưu tiên kiểm tra các trường hợp khẩn cấp."
     )
+    shortcut_col, shortcut_note = st.columns([1, 3])
+    with shortcut_col:
+        if st.button("🚨 Open urgent queue", type="primary", use_container_width=True):
+            st.session_state["_navigate_urgent_queue"] = True
+            st.rerun()
+    with shortcut_note:
+        st.caption("Mở danh sách xử lý và tự động bật bộ lọc ticket khẩn cấp.")
 
     # Chuẩn bị dữ liệu
-    preview = tickets.copy()
+    preview = ticket_view.copy()
 
     # Sắp xếp ticket theo mã tăng dần: T001, T002, ..., T100
     if "ticket_id" in preview.columns:
@@ -440,7 +488,7 @@ if page == "Dashboard Overview":
 
     # Hiển thị số lượng ticket
     st.caption(
-        f"Đang hiển thị {len(display_df):,} / {len(tickets):,} ticket "
+        f"Đang hiển thị {len(display_df):,} / {len(preview):,} ticket "
         f"• Có {total_urgent:,} ticket khẩn cấp."
     )
 
@@ -473,7 +521,7 @@ elif page == "Ticket Management":
     with urgent_col:
         urgency_filter = st.selectbox("Priority", ["All", "Urgent only", "Non-urgent"])
 
-    filtered = tickets.copy()
+    filtered = ticket_view.copy()
     if query.strip():
         message = col_series(filtered, "customer_message", "").astype(str)
         ids = col_series(filtered, "ticket_id", "").astype(str)
@@ -492,7 +540,7 @@ elif page == "Ticket Management":
         st.session_state["ticket_urgent_only"] = False
         st.rerun()
 
-    st.caption(f"Hiển thị {len(filtered):,} / {len(tickets):,} ticket")
+    st.caption(f"Hiển thị {len(filtered):,} / {len(ticket_view):,} ticket")
     cols = [c for c in ["ticket_id", "created_at", "category", "ticket_type", "topic", "sentiment", "is_urgent", "customer_message"] if c in filtered.columns]
     st.dataframe(filtered[cols] if cols else filtered, use_container_width=True, hide_index=True, height=320)
 
@@ -512,7 +560,7 @@ elif page == "Ticket Management":
         detail_cols = st.columns(4)
         for i, field in enumerate(["category", "ticket_type", "is_urgent", "created_at"]):
             with detail_cols[i]:
-                display_field(tickets, row, field)
+                display_field(ticket_view, row, field)
         with st.expander("View all original ticket fields"):
             st.json({str(k): safe_text(v) for k, v in row.to_dict().items()})
     else:
@@ -721,6 +769,8 @@ elif page == "AI Analysis & Review":
     )
 
     draft_default = ""
+    chosen_rag = "no_rag"
+    rag_ids = []
 
     if rag.empty:
         st.info("Chưa có file RAG test.")
@@ -782,7 +832,7 @@ elif page == "AI Analysis & Review":
     st.markdown("#### AI Response Draft")
     
     # AI Draft thay đổi theo RAG test case được chọn
-    draft_key = f"draft_{chosen_rag if not rag.empty and 'test_id' in rag.columns and rag_ids else 'no_rag'}"
+    draft_key = f"draft_{chosen_rag if chosen_rag != 'no_rag' else 'no_rag'}"
 
     if draft_key not in st.session_state:
         st.session_state[draft_key] = draft_default
@@ -907,8 +957,8 @@ elif page == "Management Analytics":
     # -----------------------------------------------------
     # 1. PREPARE DATA
     # -----------------------------------------------------
-    total = len(tickets)
-    # KPIs use the best available analyzed source, not only the original ticket file.
+    # KPIs use the preferred classified output when available.
+    total = len(metrics_source) if not metrics_source.empty else len(tickets)
     sentiment_frame = best_source_for("sentiment")
     sentiment_series = (
         col_series(sentiment_frame, "sentiment", "")
@@ -918,7 +968,8 @@ elif page == "Management Analytics":
     negative = int(sentiment_series.isin(negative_labels).sum())
     negative_denominator = max(len(sentiment_frame), 1)
 
-    urgent_pct = urgent_count / max(len(urgent_source), 1) * 100
+    urgent_denominator = max(len(urgent_source), 1)
+    urgent_pct = urgent_count / urgent_denominator * 100
     negative_pct = negative / negative_denominator * 100
 
     # -----------------------------------------------------
@@ -973,7 +1024,7 @@ elif page == "Management Analytics":
                     {urgent_count:,}
                 </div>
                 <div style="color:#C2413B;font-size:12px;">
-                    {urgent_pct:.1f}% of all tickets
+                    {urgent_pct:.1f}% of analyzed records
                 </div>
             </div>
             """,
@@ -999,7 +1050,7 @@ elif page == "Management Analytics":
                     {negative:,}
                 </div>
                 <div style="color:#64748B;font-size:12px;">
-                    {negative_pct:.1f}% of all tickets
+                    {negative_pct:.1f}% of analyzed records
                 </div>
             </div>
             """,
@@ -1064,13 +1115,7 @@ elif page == "Management Analytics":
             st.markdown("#### Customer sentiment")
             st.caption("Distribution of customer sentiment")
 
-            sentiment_data = tickets.copy()
-
-            if "sentiment" not in sentiment_data.columns:
-                if not classified.empty and "sentiment" in classified.columns:
-                    sentiment_data = classified.copy()
-                else:
-                    sentiment_data = pd.DataFrame()
+            sentiment_data = best_source_for("sentiment").copy()
 
             if (
                 not sentiment_data.empty
@@ -1178,10 +1223,10 @@ Topic, sentiment và urgency chỉ là tín hiệu ban đầu; cần bằng ch�
     # -----------------------------------------------------
     # 6. SOURCE MANAGEMENT REPORT
     # -----------------------------------------------------
-    with st.expander("View management_summary.md source report", expanded=False):
+    with st.expander("Open existing management summary report", expanded=False):
         if management_report_text.strip():
             st.markdown(management_report_text)
-            st.caption(f"Source file: {management_report_path.name}")
+            st.caption(f"Nguồn: file báo cáo có sẵn · {management_report_path.name}. Đây không phải nội dung vừa được AI tạo trực tiếp trên trang này.")
         else:
             st.info(
                 "Chưa tìm thấy management_summary.md hoặc file đang trống. "
@@ -1237,6 +1282,7 @@ elif page == "Classified Output":
     st.title("Classified Output")
     st.markdown('<div class="section-note">Tra cứu dữ liệu đã phân loại, lọc theo thuộc tính và xuất kết quả để phục vụ báo cáo.</div>', unsafe_allow_html=True)
 
+    # Prefer the dedicated classified workbook; use analysis/tickets only as fallback.
     source = classified.copy() if not classified.empty else (analysis.copy() if not analysis.empty else tickets.copy())
     if source.empty:
         st.warning("Không có dữ liệu Classified Output để hiển thị.")
