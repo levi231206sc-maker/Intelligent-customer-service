@@ -480,103 +480,372 @@ elif page == "Ticket Management":
 # PAGE 3: AI ANALYSIS & HUMAN REVIEW
 # =========================================================
 elif page == "AI Analysis & Review":
-    st.title("AI Analysis & Human Review")
-    st.markdown('<div class="section-note">Quy trình: hiểu yêu cầu → kiểm tra mức độ ưu tiên → tham khảo Knowledge Base → chỉnh sửa bản nháp → quyết định của nhân viên.</div>', unsafe_allow_html=True)
 
+    st.title("AI Analysis & Review")
+    st.markdown(
+        '<div class="section-note">'
+        'Xem kết quả phân tích AI, kiểm tra định tuyến, '
+        'tham khảo kiến thức và duyệt bản nháp phản hồi trước khi gửi.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # -----------------------------------------------------
+    # 1. SELECT TICKET
+    # -----------------------------------------------------
     if "ticket_id" not in tickets.columns:
         st.warning("File tickets cần có cột ticket_id.")
         st.stop()
-    ticket_ids = tickets["ticket_id"].astype(str).tolist()
-    current = st.session_state.get("selected_ticket_id", ticket_ids[0])
+
+    ticket_ids = (
+        tickets["ticket_id"]
+        .dropna()
+        .astype(str)
+        .tolist()
+    )
+
+    if not ticket_ids:
+        st.warning("Chưa có ticket để phân tích.")
+        st.stop()
+
+    current = st.session_state.get(
+        "selected_ticket_id",
+        ticket_ids[0],
+    )
+
     if current not in ticket_ids:
         current = ticket_ids[0]
-    selected = st.selectbox("Select ticket to review", ticket_ids, index=ticket_ids.index(current))
+
+    selected = st.selectbox(
+        "Select ticket to review",
+        ticket_ids,
+        index=ticket_ids.index(current),
+        key="analysis_selected_ticket",
+    )
+
     st.session_state["selected_ticket_id"] = selected
-    ticket_row = tickets[tickets["ticket_id"].astype(str) == selected].iloc[0]
 
-    st.markdown("#### 1. Customer request")
-    st.info(safe_text(ticket_row.get("customer_message", "No customer message available.")))
+    ticket_row = tickets[
+        tickets["ticket_id"].astype(str) == selected
+    ].iloc[0]
+
+    # -----------------------------------------------------
+    # CUSTOMER REQUEST
+    # -----------------------------------------------------
+    st.markdown("### Customer Request")
+
+    st.markdown(
+        '<div class="section-note">'
+        'Nội dung gốc khách hàng gửi đến ngân hàng.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.info(
+        safe_text(
+            ticket_row.get(
+                "customer_message",
+                "No customer message available.",
+            )
+        )
+    )
+
+    # Lấy kết quả phân tích của ticket được chọn
     arow_df = match_ticket(analysis, selected)
-    arow = arow_df.iloc[0] if not arow_df.empty else pd.Series(dtype=object)
+    arow = (
+        arow_df.iloc[0]
+        if not arow_df.empty
+        else pd.Series(dtype=object)
+    )
 
-    with st.expander("2. AI Analysis", expanded=True):
-        if arow_df.empty:
-            st.info("Không tìm thấy kết quả AI Analysis cho ticket này trong file phân tích.")
-        else:
-            fields = ["intent", "topic", "product", "amount", "channel", "transaction_time", "transaction_id", "sentiment", "missing_information", "note"]
-            existing = [f for f in fields if f in arow.index]
-            cols = st.columns(3)
-            for i, field in enumerate(existing):
-                with cols[i % 3]:
-                    display_field(analysis, arow, field)
+    st.divider()
 
-    with st.expander("3. Priority & Routing", expanded=True):
-        # Routing file is a test report and may not be keyed to production ticket IDs.
-        if routing.empty:
-            st.info("Chưa có file routing test.")
-        else:
-            st.caption("Routing test results are shown separately because test_id may not correspond to a production ticket_id.")
-            if "test_id" in routing.columns:
-                test_ids = routing["test_id"].dropna().astype(str).tolist()
-                chosen_test = st.selectbox("Routing test case", test_ids, key="routing_test_case")
-                rr = routing[routing["test_id"].astype(str) == chosen_test].iloc[0]
+    # -----------------------------------------------------
+    # AI ANALYSIS
+    # -----------------------------------------------------
+    st.markdown("### AI Analysis")
+
+    st.caption(
+        "Kết quả AI nhận diện ý định, chủ đề, cảm xúc "
+        "và các thông tin liên quan đến yêu cầu."
+    )
+
+    if arow_df.empty:
+        st.info(
+            "Không tìm thấy kết quả AI Analysis "
+            "cho ticket này trong file phân tích."
+        )
+    else:
+        fields = [
+            "intent",
+            "topic",
+            "product",
+            "amount",
+            "channel",
+            "transaction_time",
+            "transaction_id",
+            "sentiment",
+            "missing_information",
+            "note",
+        ]
+
+        existing = [
+            field for field in fields
+            if field in arow.index
+        ]
+
+        cols = st.columns(3)
+
+        for i, field in enumerate(existing):
+            with cols[i % 3]:
+                display_field(analysis, arow, field)
+
+    st.divider()
+
+    # -----------------------------------------------------
+    # PRIORITY & ROUTING
+    # -----------------------------------------------------
+    st.markdown("### Priority & Routing")
+
+    st.caption(
+        "Kiểm tra kết quả ưu tiên và định tuyến "
+        "trên các tình huống kiểm thử của hệ thống."
+    )
+
+    if routing.empty:
+        st.info("Chưa có file routing test.")
+    else:
+        st.caption(
+            "Lưu ý: đây là dữ liệu kiểm thử định tuyến. "
+            "Mã test case không nhất thiết tương ứng với mã ticket thực tế."
+        )
+
+        if "test_id" in routing.columns:
+            test_ids = (
+                routing["test_id"]
+                .dropna()
+                .astype(str)
+                .drop_duplicates()
+                .tolist()
+            )
+
+            if test_ids:
+                chosen_test = st.selectbox(
+                    "Routing test case",
+                    test_ids,
+                    key="routing_test_case",
+                )
+
+                rr = routing[
+                    routing["test_id"].astype(str) == chosen_test
+                ].iloc[0]
             else:
-                rr = routing.iloc[0]
-            route_fields = ["expected_priority", "actual_priority", "urgency", "expected_department", "actual_department", "routing_reason", "both_correct"]
-            existing = [f for f in route_fields if f in rr.index]
+                rr = None
+        else:
+            rr = routing.iloc[0]
+
+        if rr is not None:
+            route_fields = [
+                "expected_priority",
+                "actual_priority",
+                "urgency",
+                "expected_department",
+                "actual_department",
+                "routing_reason",
+                "both_correct",
+            ]
+
+            existing = [
+                field for field in route_fields
+                if field in rr.index
+            ]
+
             cols = st.columns(3)
+
             for i, field in enumerate(existing):
                 with cols[i % 3]:
                     display_field(routing, rr, field)
 
-    with st.expander("4. Knowledge Base & Draft Response", expanded=True):
-        if rag.empty:
-            st.info("Chưa có file RAG test.")
-            draft_default = ""
-        else:
-            if "test_id" in rag.columns:
-                rag_ids = rag["test_id"].dropna().astype(str).tolist()
-                chosen_rag = st.selectbox("RAG test case", rag_ids, key="rag_test_case")
-                rrow = rag[rag["test_id"].astype(str) == chosen_rag].iloc[0]
-            else:
-                rrow = rag.iloc[0]
-            rag_cols = st.columns(2)
-            with rag_cols[0]:
-                for field in ["actual_kb_found", "actual_source", "actual_confidence"]:
-                    if field in rrow.index:
-                        display_field(rag, rrow, field)
-            with rag_cols[1]:
-                for field in ["actual_reason", "expected_faq_source", "test_result"]:
-                    if field in rrow.index:
-                        display_field(rag, rrow, field)
-            draft_default = safe_text(rrow.get("actual_draft_response", ""), "")
-        draft_key = f"draft_{selected}"
-        if draft_key not in st.session_state:
-            st.session_state[draft_key] = draft_default
-        edited_draft = st.text_area("AI draft — review and edit before approval", key=draft_key, height=180, placeholder="Bản nháp phản hồi sẽ xuất hiện tại đây nếu có trong dữ liệu.")
-        st.caption("Lưu ý: đây là bản nháp để nhân viên rà soát; ứng dụng không tự gửi phản hồi cho khách hàng.")
+    st.divider()
 
-    st.markdown("#### 5. Human Review")
+    # -----------------------------------------------------
+    # KNOWLEDGE BASE & AI DRAFT
+    # -----------------------------------------------------
+    st.markdown("### Knowledge Base & AI Draft")
+
+    st.caption(
+        "Kiểm tra kiến thức được truy xuất và nội dung "
+        "AI đề xuất trước khi nhân viên duyệt."
+    )
+
+    draft_default = ""
+
+    if rag.empty:
+        st.info("Chưa có file RAG test.")
+    else:
+        if "test_id" in rag.columns:
+            rag_ids = (
+                rag["test_id"]
+                .dropna()
+                .astype(str)
+                .drop_duplicates()
+                .tolist()
+            )
+
+            if rag_ids:
+                chosen_rag = st.selectbox(
+                    "RAG test case",
+                    rag_ids,
+                    key="rag_test_case",
+                )
+
+                rrow = rag[
+                    rag["test_id"].astype(str) == chosen_rag
+                ].iloc[0]
+            else:
+                rrow = None
+        else:
+            rrow = rag.iloc[0]
+
+        if rrow is not None:
+            # Kết quả truy xuất kiến thức
+            st.markdown("#### Retrieved Knowledge")
+
+            kb_col1, kb_col2 = st.columns(2)
+
+            with kb_col1:
+                for field in [
+                    "actual_kb_found",
+                    "actual_source",
+                    "actual_confidence",
+                ]:
+                    if field in rrow.index:
+                        display_field(rag, rrow, field)
+
+            with kb_col2:
+                for field in [
+                    "actual_reason",
+                    "expected_faq_source",
+                    "test_result",
+                ]:
+                    if field in rrow.index:
+                        display_field(rag, rrow, field)
+
+            # Lấy bản nháp từ dữ liệu kiểm thử
+            draft_default = safe_text(
+                rrow.get("actual_draft_response", ""),
+                "",
+            )
+
+    st.markdown("#### AI Response Draft")
+
+    draft_key = f"draft_{selected}"
+
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = draft_default
+
+    edited_draft = st.text_area(
+        "Review and edit the response before approval",
+        key=draft_key,
+        height=180,
+        placeholder=(
+            "Bản nháp phản hồi sẽ xuất hiện tại đây "
+            "nếu có trong dữ liệu."
+        ),
+    )
+
+    st.caption(
+        "Bản nháp cần được nhân viên rà soát. "
+        "Ứng dụng không tự động gửi phản hồi cho khách hàng."
+    )
+
+    st.divider()
+
+    # -----------------------------------------------------
+    # HUMAN REVIEW
+    # -----------------------------------------------------
+    st.markdown("### Human Review")
+
+    st.caption(
+        "Nhân viên kiểm tra bản nháp, ghi chú và lựa chọn "
+        "trạng thái xử lý phù hợp."
+    )
+
     status_key = f"review_status_{selected}"
     review_note_key = f"review_note_{selected}"
-    st.session_state.setdefault(status_key, "Pending review")
-    st.session_state.setdefault(review_note_key, "")
-    review_note = st.text_area("Reviewer note (optional)", key=review_note_key, placeholder="Ghi chú chỉnh sửa, lý do chuyển cấp hoặc thông tin cần xác minh...")
+
+    st.session_state.setdefault(
+        status_key,
+        "Pending review",
+    )
+
+    st.session_state.setdefault(
+        review_note_key,
+        "",
+    )
+
+    current_status = st.session_state[status_key]
+
+    st.markdown(
+        f"**Current review status:** `{current_status}`"
+    )
+
+    review_note = st.text_area(
+        "Reviewer note (optional)",
+        key=review_note_key,
+        placeholder=(
+            "Ghi chú chỉnh sửa, lý do chuyển cấp "
+            "hoặc thông tin cần xác minh..."
+        ),
+    )
+
     b1, b2, b3 = st.columns(3)
+
     with b1:
-        if st.button("✏️ Save as edited", use_container_width=True):
+        if st.button(
+            "✏️ Save as edited",
+            use_container_width=True,
+            key=f"save_edited_{selected}",
+        ):
             st.session_state[status_key] = "Edited"
-            st.success("Đã lưu trạng thái trong phiên làm việc hiện tại.")
+            st.success(
+                "Đã đánh dấu bản nháp là Edited "
+                "trong phiên làm việc hiện tại."
+            )
+            st.rerun()
+
     with b2:
-        if st.button("✅ Approve draft", type="primary", use_container_width=True):
+        if st.button(
+            "✅ Approve draft",
+            type="primary",
+            use_container_width=True,
+            key=f"approve_{selected}",
+        ):
             st.session_state[status_key] = "Approved"
-            st.success("Đã đánh dấu bản nháp là Approved trong phiên làm việc hiện tại.")
+            st.success(
+                "Đã đánh dấu bản nháp là Approved "
+                "trong phiên làm việc hiện tại."
+            )
+            st.rerun()
+
     with b3:
-        if st.button("⚠️ Escalate", use_container_width=True):
+        if st.button(
+            "⚠️ Escalate",
+            use_container_width=True,
+            key=f"escalate_{selected}",
+        ):
             st.session_state[status_key] = "Escalated"
-            st.warning("Đã đánh dấu ticket cần chuyển cấp trong phiên làm việc hiện tại.")
-    st.markdown(f"**Current review status:** `{st.session_state[status_key]}`")
-    st.caption("Trạng thái review hiện được giữ trong session của ứng dụng; muốn lưu lâu dài giữa các phiên hoặc cho nhiều nhân viên cần kết nối database.")
+            st.warning(
+                "Đã đánh dấu ticket cần chuyển cấp "
+                "trong phiên làm việc hiện tại."
+            )
+            st.rerun()
+
+    st.caption(
+        "Trạng thái review hiện được lưu trong session của ứng dụng. "
+        "Muốn lưu lâu dài giữa các phiên hoặc chia sẻ giữa nhiều nhân viên, "
+        "cần kết nối database."
+    )
 
 # =========================================================
 # PAGE 4: MANAGEMENT ANALYTICS
