@@ -1029,11 +1029,6 @@ elif page == "Management Analytics":
     else:
         st.info("Cần có hai cột created_at và category để phân tích xu hướng.")
 
-    if management_report_text.strip():
-        with st.expander("View management summary note"):
-            st.markdown(management_report_text)
-
-
 # =========================================================
 # PAGE 5: CLASSIFIED OUTPUT
 # =========================================================
