@@ -385,11 +385,9 @@ urgent_preview = urgent_preview.drop(
     columns=["_urgent_sort"],
     errors="ignore"
 )
-
+    
     # Hai nút điều hướng
-    action_col1, action_col2, action_col3 = st.columns(
-        [1.5, 1, 3]
-    )
+    action_col1, action_col2, action_col3 = st.columns([1.5, 1, 3])
 
     with action_col1:
         if st.button(
