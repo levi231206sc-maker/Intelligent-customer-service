@@ -965,9 +965,20 @@ elif page == "Management Analytics":
         col_series(sentiment_frame, "sentiment", "")
         .fillna("").astype(str).str.strip().str.lower()
     )
+   
+    # Chuẩn hóa nhãn cảm xúc
     negative_labels = {"negative", "neg", "negative sentiment", "tiêu cực", "tieu cuc"}
+    neutral_labels = {"neutral", "neu", "neutral sentiment", "trung tính", "trung tinh"}
+    positive_labels = {"positive", "pos", "positive sentiment", "tích cực", "tich cuc"}
+    
     negative = int(sentiment_series.isin(negative_labels).sum())
+    neutral = int(sentiment_series.isin(neutral_labels).sum())
+    positive = int(sentiment_series.isin(positive_labels).sum())
+    
     negative_denominator = max(len(sentiment_frame), 1)
+    neutral_pct = neutral / negative_denominator * 100
+    positive_pct = positive / negative_denominator * 100
+    negative_pct = negative / negative_denominator * 100
 
     urgent_denominator = max(len(urgent_source), 1)
     urgent_pct = urgent_count / urgent_denominator * 100
