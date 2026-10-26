@@ -226,7 +226,7 @@ if page == "Dashboard Overview":
     with q2:
         st.markdown("#### Ticket distribution")
         chart_col1, chart_col2 = st.columns(2)
-        with chart_col1:
+    with chart_col1:
     st.caption("Tickets by category")
 
     if "category" in tickets.columns:
@@ -268,7 +268,7 @@ if page == "Dashboard Overview":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Không có cột category trong dữ liệu.")
-        with chart_col2:
+    with chart_col2:
     st.caption("Tickets by type")
 
     if "ticket_type" in tickets.columns:
