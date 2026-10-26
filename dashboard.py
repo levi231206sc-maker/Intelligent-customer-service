@@ -1,4 +1,5 @@
 from pathlib import Path
+from io import BytesIO
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -148,6 +149,12 @@ def display_field(frame, row, field, label=None):
     label = label or field.replace("_", " ").title()
     st.markdown(f"**{label}**")
     st.write(safe_text(row.get(field, "—")))
+
+def to_excel_bytes(frame):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        frame.to_excel(writer, index=False, sheet_name="Classified Output")
+    return output.getvalue()
 
 # =========================================================
 # SIDEBAR NAVIGATION
@@ -939,13 +946,19 @@ elif page == "AI Analysis & Review":
 # PAGE 4: MANAGEMENT ANALYTICS
 # =========================================================
 elif page == "Management Analytics":
-    st.title("Management Summary")
+    st.title("Phân tích quản lý")
     st.markdown(
-        '<div class="section-note">Phạm vi dữ liệu, chỉ số hiệu quả, phân bố chủ đề/cảm xúc và phát hiện biến động số lượng ticket.</div>',
+        '<div class="section-note">'
+        'Tổng quan hiệu quả xử lý ticket, cảm xúc khách hàng '
+        'và xu hướng khiếu nại.'
+        '</div>',
         unsafe_allow_html=True,
     )
 
-    # Use the best available source for each analyzed field.
+    # -----------------------------------------------------
+    # 1. PREPARE DATA
+    # -----------------------------------------------------
+    # KPIs use the preferred classified output when available.
     total = len(metrics_source) if not metrics_source.empty else len(tickets)
     sentiment_frame = best_source_for("sentiment")
     sentiment_series = (
@@ -955,94 +968,269 @@ elif page == "Management Analytics":
     negative_labels = {"negative", "neg", "negative sentiment", "tiêu cực", "tieu cuc"}
     negative = int(sentiment_series.isin(negative_labels).sum())
     negative_denominator = max(len(sentiment_frame), 1)
+
     urgent_denominator = max(len(urgent_source), 1)
     urgent_pct = urgent_count / urgent_denominator * 100
     negative_pct = negative / negative_denominator * 100
 
-    # 1. SCOPE AND KEY PERFORMANCE INDICATORS
-    st.markdown("### 1. Scope and Key Performance Indicators")
-    scope_source = best_source_for("created_at")
-    if "created_at" in scope_source.columns:
-        scope_dates = pd.to_datetime(scope_source["created_at"], errors="coerce").dropna()
-    else:
-        scope_dates = pd.Series(dtype="datetime64[ns]")
-    if not scope_dates.empty:
-        scope_start = scope_dates.min().strftime("%d/%m/%Y")
-        scope_end = scope_dates.max().strftime("%d/%m/%Y")
-        scope_days = int((scope_dates.max().normalize() - scope_dates.min().normalize()).days) + 1
-        st.caption(f"Reporting period: {scope_start} – {scope_end} · {scope_days} calendar days · {total:,} tickets in the available dataset")
-    else:
-        st.caption(f"Reporting scope: all available records · {total:,} tickets. Không tìm thấy created_at hợp lệ để xác định khoảng thời gian.")
+    # -----------------------------------------------------
+    # 2. KPI CARDS
+    # -----------------------------------------------------
+    st.markdown("### Tổng quan hiệu quả")
 
     k1, k2, k3, k4 = st.columns(4)
+
     with k1:
-        st.markdown(f'''<div style="background:#FFFFFF;border:1px solid #DCE5EF;border-radius:12px;padding:18px;min-height:115px;box-shadow:0 2px 8px rgba(16,43,78,0.04);"><div style="color:#64748B;font-size:13px;">Total tickets</div><div style="color:#17365D;font-size:30px;font-weight:700;margin-top:8px;">{total:,}</div><div style="color:#64748B;font-size:12px;">All recorded tickets</div></div>''', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Tổng số ticket
+                </div>
+                <div style="color:#17365D;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {total:,}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    Tất cả ticket trong dữ liệu
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     with k2:
-        st.markdown(f'''<div style="background:#FFFFFF;border:1px solid #F2D5D3;border-radius:12px;padding:18px;min-height:115px;box-shadow:0 2px 8px rgba(16,43,78,0.04);"><div style="color:#64748B;font-size:13px;">Urgent tickets</div><div style="color:#C2413B;font-size:30px;font-weight:700;margin-top:8px;">{urgent_count:,}</div><div style="color:#C2413B;font-size:12px;">{urgent_pct:.1f}% of analyzed records</div></div>''', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #F2D5D3;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Ticket khẩn cấp
+                </div>
+                <div style="color:#C2413B;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {urgent_count:,}
+                </div>
+                <div style="color:#C2413B;font-size:12px;">
+                    {urgent_pct:.1f}% of analyzed records
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     with k3:
-        st.markdown(f'''<div style="background:#FFFFFF;border:1px solid #DCE5EF;border-radius:12px;padding:18px;min-height:115px;box-shadow:0 2px 8px rgba(16,43,78,0.04);"><div style="color:#64748B;font-size:13px;">Negative sentiment</div><div style="color:#17365D;font-size:30px;font-weight:700;margin-top:8px;">{negative:,}</div><div style="color:#64748B;font-size:12px;">{negative_pct:.1f}% of analyzed records</div></div>''', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Cảm xúc tiêu cực
+                </div>
+                <div style="color:#17365D;font-size:30px;
+                            font-weight:700;margin-top:8px;">
+                    {negative:,}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    {negative_pct:.1f}% of analyzed records
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     with k4:
-        st.markdown(f'''<div style="background:#FFFFFF;border:1px solid #DCE5EF;border-radius:12px;padding:18px;min-height:115px;box-shadow:0 2px 8px rgba(16,43,78,0.04);"><div style="color:#64748B;font-size:13px;">Most common topic</div><div style="color:#17365D;font-size:24px;font-weight:700;margin-top:12px;overflow-wrap:anywhere;">{top_category}</div><div style="color:#64748B;font-size:12px;">Most frequent category/topic</div></div>''', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div style="
+                background:#FFFFFF;
+                border:1px solid #DCE5EF;
+                border-radius:12px;
+                padding:18px;
+                min-height:115px;
+                box-shadow:0 2px 8px rgba(16,43,78,0.04);
+            ">
+                <div style="color:#64748B;font-size:13px;">
+                    Chủ đề phổ biến nhất
+                </div>
+                <div style="color:#17365D;font-size:24px;
+                            font-weight:700;margin-top:12px;
+                            overflow-wrap:anywhere;">
+                    {top_category}
+                </div>
+                <div style="color:#64748B;font-size:12px;">
+                    Chủ đề xuất hiện nhiều nhất
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    # 2. TOPIC DISTRIBUTION
-    st.markdown("### 2. Topic Distribution")
-    with st.container(border=True):
-        st.caption("Number of tickets by topic")
-        topic_frame = best_source_for("topic")
-        if "topic" in topic_frame.columns and topic_frame["topic"].notna().any():
-            topic_counts = topic_frame["topic"].fillna("Unknown").astype(str).str.strip().replace("", "Unknown").value_counts().head(10).sort_values()
-            st.bar_chart(topic_counts, horizontal=True, height=320, color="#3575B5")
-        else:
-            st.info("Không tìm thấy dữ liệu topic trong các file hiện có.")
+    # -----------------------------------------------------
+    # 3. DISTRIBUTION CHARTS
+    # -----------------------------------------------------
+    st.markdown("")
+    st.markdown("### Phân bố ticket")
 
-    # 3. SENTIMENT DISTRIBUTION
-    st.markdown("### 3. Sentiment Distribution")
-    with st.container(border=True):
-        st.caption("Distribution of customer sentiment")
-        sentiment_data = best_source_for("sentiment").copy()
-        if not sentiment_data.empty and "sentiment" in sentiment_data.columns:
-            sentiment_counts = sentiment_data["sentiment"].fillna("Unknown").astype(str).str.strip().replace("", "Unknown").value_counts()
-            st.bar_chart(sentiment_counts, height=300, color="#3575B5")
-        else:
-            st.info("Không tìm thấy dữ liệu sentiment.")
+    left, right = st.columns(2, gap="large")
 
-    # 4. TICKET TREND AND SPIKE DETECTION
-    st.markdown("### 4. Ticket Trend and Spike Detection")
-    st.caption("Số lượng ticket theo ngày; ngày có số ticket cao bất thường được đánh dấu để kiểm tra thêm.")
+    with left:
+        with st.container(border=True):
+            st.markdown("#### Chủ đề ticket")
+            st.caption("Số lượng ticket theo chủ đề")
+
+            topic_frame = best_source_for("topic")
+            if "topic" in topic_frame.columns and topic_frame["topic"].notna().any():
+                topic_counts = (
+                    topic_frame["topic"].fillna("Unknown").astype(str)
+                    .str.strip().replace("", "Unknown").value_counts()
+                    .head(10).sort_values()
+                )
+                st.bar_chart(
+                    topic_counts, horizontal=True, height=320, color="#3575B5"
+                )
+            else:
+                st.info("Không tìm thấy dữ liệu topic trong các file hiện có.")
+
+    with right:
+        with st.container(border=True):
+            st.markdown("#### Cảm xúc khách hàng")
+            st.caption("Phân bố cảm xúc khách hàng")
+
+            sentiment_data = best_source_for("sentiment").copy()
+
+            if (
+                not sentiment_data.empty
+                and "sentiment" in sentiment_data.columns
+            ):
+                sentiment_counts = (
+                    sentiment_data["sentiment"]
+                    .fillna("Unknown")
+                    .astype(str)
+                    .str.strip()
+                    .replace("", "Unknown")
+                    .value_counts()
+                )
+
+                st.bar_chart(
+                    sentiment_counts,
+                    height=320,
+                    color="#3575B5",
+                )
+            else:
+                st.info("Không tìm thấy dữ liệu sentiment.")
+
+    # -----------------------------------------------------
+    # 4. COMPLAINT TREND
+    # -----------------------------------------------------
+    st.markdown("")
+    st.markdown("### Xu hướng khiếu nại")
+    st.caption("Số ticket được phân loại là khiếu nại theo ngày")
+
     with st.container(border=True):
-        trend_source = best_source_for("created_at")
-        if "created_at" in trend_source.columns:
+        trend_source = best_source_for("category")
+        if "created_at" in trend_source.columns and "category" in trend_source.columns:
             trend = trend_source.copy()
-            trend["created_at"] = pd.to_datetime(trend["created_at"], errors="coerce")
-            trend = trend.dropna(subset=["created_at"])
+            trend["created_at"] = pd.to_datetime(
+                trend["created_at"],
+                errors="coerce",
+            )
+
+            category_values = (
+                trend["category"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+
+            trend = trend[
+                category_values.isin(
+                    {"complaint", "complaints", "khiếu nại", "khieu nai"}
+                )
+            ].dropna(subset=["created_at"])
+
             if not trend.empty:
                 trend["Date"] = trend["created_at"].dt.normalize()
-                daily = trend.groupby("Date").size().rename("Tickets").to_frame()
-                st.line_chart(daily, height=280, color="#3575B5")
-                mean_daily = float(daily["Tickets"].mean())
-                std_daily = float(daily["Tickets"].std(ddof=0))
-                threshold = mean_daily + 2 * std_daily
-                spikes = daily[daily["Tickets"] > threshold].copy()
-                st.caption(f"Daily average: {mean_daily:.2f} tickets · Spike threshold: more than {threshold:.2f} tickets/day (mean + 2 standard deviations).")
-                if not spikes.empty:
-                    st.markdown("**Potential spikes detected**")
-                    spike_table = spikes.reset_index().rename(columns={"Date": "Date", "Tickets": "Ticket count"})
-                    spike_table["Date"] = pd.to_datetime(spike_table["Date"]).dt.strftime("%d/%m/%Y")
-                    st.dataframe(spike_table, hide_index=True, use_container_width=True)
-                    st.warning("Các ngày này là tín hiệu bất thường theo ngưỡng thống kê, không tự động khẳng định có sự cố. Cần kiểm tra bối cảnh và dữ liệu vận hành.")
-                else:
-                    st.info("Không phát hiện ngày vượt ngưỡng spike theo quy tắc mean + 2 standard deviations trong dữ liệu hiện có.")
+
+                daily = (
+                    trend.groupby("Date")
+                    .size()
+                    .rename("Complaints")
+                    .to_frame()
+                )
+
+                st.line_chart(
+                    daily,
+                    height=280,
+                    color="#3575B5",
+                )
+                st.caption(
+                    f"Total complaints in the displayed period: "
+                    f"{len(trend):,}"
+                )
             else:
-                st.info("Không có ngày hợp lệ để hiển thị xu hướng ticket.")
+                st.info(
+                    "Không tìm thấy dữ liệu khiếu nại có ngày hợp lệ. "
+                    "Hãy kiểm tra giá trị trong cột category."
+                )
         else:
-            st.info("Cần cột created_at để hiển thị xu hướng ticket và phát hiện spike.")
+            st.info(
+                "Cần có hai cột created_at và category để hiển thị xu hướng."
+            )
+
+    # -----------------------------------------------------
+    # 5. EXPORT SUMMARY (without repeating KPI cards)
+    # -----------------------------------------------------
+    summary = pd.DataFrame([
+        {"Chỉ số": "Tổng số ticket", "Giá trị": total},
+        {"Chỉ số": "Ticket khẩn cấp", "Giá trị": urgent_count},
+        {"Chỉ số": "Ticket khiếu nại", "Giá trị": complaint_count},
+        {"Chỉ số": "Cảm xúc tiêu cực", "Giá trị": negative},
+        {"Chỉ số": "Chủ đề phổ biến nhất", "Giá trị": top_category},
+    ])
+
+    export_col, note_col = st.columns([1, 3])
+    with export_col:
+        st.download_button(
+            "Tải báo cáo CSV",
+            summary.to_csv(index=False).encode("utf-8-sig"),
+            "management_summary.csv",
+            "text/csv",
+            use_container_width=True,
+        )
+    with note_col:
+        st.caption(
+            "Xuất nhanh các chỉ số đang hiển thị để lưu trữ hoặc mở bằng Excel. "
+            "Báo cáo chi tiết có thể được lưu riêng trong hồ sơ dự án."
+        )
 
 
+# =========================================================
 # PAGE 5: CLASSIFIED OUTPUT
 # =========================================================
 elif page == "Classified Output":
     st.title("Classified Output")
-    st.markdown('<div class="section-note">Tra cứu, tìm kiếm và lọc dữ liệu đã phân loại theo các thuộc tính.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-note">Tra cứu dữ liệu đã phân loại, lọc theo thuộc tính và xuất kết quả để phục vụ báo cáo.</div>', unsafe_allow_html=True)
 
     # Prefer the dedicated classified workbook; use analysis/tickets only as fallback.
     source = classified.copy() if not classified.empty else (analysis.copy() if not analysis.empty else tickets.copy())
@@ -1079,6 +1267,29 @@ elif page == "Classified Output":
     st.metric("Matching records", f"{len(filtered):,}")
     st.dataframe(filtered, use_container_width=True, hide_index=True, height=430)
 
+    d1, d2 = st.columns(2)
+    with d1:
+        st.download_button(
+            "⬇️ Download filtered CSV",
+            data=filtered.to_csv(index=False).encode("utf-8-sig"),
+            file_name="classified_output.csv",
+            mime="text/csv",
+            use_container_width=True,
+            type="primary",
+        )
+    with d2:
+        try:
+            excel_data = to_excel_bytes(filtered)
+            st.download_button(
+                "⬇️ Download filtered Excel",
+                data=excel_data,
+                file_name="classified_output.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception as exc:
+            st.warning(f"Không tạo được file Excel: {exc}")
+    st.caption("Lưu ý: chỉ tải xuống và chia sẻ dữ liệu theo quyền được phép; tránh công khai thông tin định danh hoặc dữ liệu giao dịch nhạy cảm.")
 
 st.divider()
 st.caption("Intelligent Customer Service · Internal review workspace · AI suggestions require human review")
