@@ -1,1135 +1,543 @@
-import streamlit as st
+from pathlib import Path
+from io import BytesIO
 import pandas as pd
+import streamlit as st
 
+# =========================================================
+# APP CONFIG
+# =========================================================
 st.set_page_config(
     page_title="Intelligent Customer Service",
     page_icon="🏦",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# =========================
-# BANKING PROFESSIONAL THEME
-# =========================
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIRS = [BASE_DIR, BASE_DIR / "data", BASE_DIR.parent / "data"]
 
-# =========================
-# MODERN SAAS + FINTECH THEME
-# =========================
+FILES = {
+    "tickets": ["tickets.xlsx", "tickets(3).xlsx"],
+    "analysis": ["tickets_analyzed.xlsx", "classified_feedback.xlsx"],
+    "routing": ["test_routing.xlsx", "test_routing_results.xlsx"],
+    "rag": ["test_rag.xlsx", "rag_results.xlsx"],
+    "classified": ["Copy of classified_feedback.xlsx", "classified_feedback.xlsx", "tickets_analyzed.xlsx"],
+}
 
+# =========================================================
+# THEME
+# =========================================================
 st.markdown("""
 <style>
-/* ===== GLOBAL DESIGN ===== */
 :root {
-    --navy: #142D4E;
-    --blue: #3978C5;
-    --blue-light: #EAF2FC;
-    --page-bg: #F4F7FB;
-    --text: #25364B;
-    --muted: #718096;
-    --border: #E4EAF2;
-    --white: #FFFFFF;
+  --navy:#153451; --blue:#2F6FB2; --pale:#EAF2FA;
+  --page:#F5F7FB; --ink:#24364B; --muted:#6B7C90;
+  --border:#E1E8F0; --white:#FFFFFF;
 }
-
-.stApp {
-    background: var(--page-bg);
-    color: var(--text);
-    font-family: "Inter", "Segoe UI", sans-serif;
-}
-
-[data-testid="stHeader"] {
-    background: rgba(244, 247, 251, 0.92);
-}
-
-[data-testid="stMainBlockContainer"] {
-    max-width: 1500px;
-    padding: 1.8rem 2.2rem 3rem;
-}
-
-/* ===== TYPOGRAPHY ===== */
-h1, h2, h3 {
-    color: var(--navy) !important;
-    letter-spacing: -0.45px;
-}
-
-h1 {
-    font-weight: 800 !important;
-}
-
-h2, h3 {
-    font-weight: 700 !important;
-}
-
-p, label, .stMarkdown {
-    line-height: 1.65;
-}
-
-[data-testid="stCaptionContainer"] {
-    color: var(--muted);
-    font-size: 0.86rem;
-}
-
-/* ===== SECTION SPACING ===== */
-hr {
-    border: none;
-    height: 1px;
-    background: var(--border);
-    margin: 2rem 0;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"] {
-    border-color: var(--border);
-    border-radius: 16px;
-}
-
-/* ===== KPI CARDS ===== */
+.stApp { background:var(--page); color:var(--ink); }
+[data-testid="stMainBlockContainer"] { max-width:1500px; padding-top:1.5rem; padding-bottom:3rem; }
+[data-testid="stSidebar"] { background:#fff; border-right:1px solid var(--border); }
+h1,h2,h3 { color:var(--navy)!important; letter-spacing:-.3px; }
+h1 { font-weight:800!important; }
+h2,h3 { font-weight:720!important; }
+p,li { line-height:1.6; }
 [data-testid="stMetric"] {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 20px 22px;
-    box-shadow: 0 3px 10px rgba(20, 45, 78, 0.035);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  background:#fff; border:1px solid var(--border); border-radius:14px;
+  padding:17px 19px; box-shadow:0 2px 8px rgba(21,52,81,.035);
 }
-
-[data-testid="stMetric"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 22px rgba(20, 45, 78, 0.075);
+[data-testid="stMetricLabel"] { color:var(--muted)!important; font-weight:650!important; }
+[data-testid="stMetricValue"] { color:var(--navy)!important; font-weight:800!important; }
+div[data-baseweb="select"]>div, div[data-baseweb="input"]>div {
+  border-radius:9px; border-color:#D7E1ED; background:#fff;
 }
-
-[data-testid="stMetricLabel"] {
-    color: var(--muted) !important;
-    font-size: 0.88rem !important;
-    font-weight: 600 !important;
+.stButton>button,.stDownloadButton>button {
+  border-radius:9px; min-height:40px; font-weight:650; border:1px solid #D7E1ED;
 }
-
-[data-testid="stMetricValue"] {
-    color: var(--navy) !important;
-    font-size: 1.8rem !important;
-    font-weight: 800 !important;
+.stButton>button[kind="primary"],.stDownloadButton>button[kind="primary"] {
+  background:var(--navy); border-color:var(--navy); color:#fff;
 }
-
-[data-testid="stMetricDelta"] {
-    font-size: 0.8rem;
+[data-testid="stDataFrame"],[data-testid="stTable"] {
+  border:1px solid var(--border); border-radius:11px; overflow:hidden; background:#fff;
 }
-
-/* ===== TABLES ===== */
-[data-testid="stDataFrame"],
-[data-testid="stTable"] {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
+[data-testid="stExpander"] { background:#fff; border:1px solid var(--border); border-radius:11px; }
+[data-testid="stAlert"] { border-radius:10px; }
+.hero {
+  background:linear-gradient(120deg,#10263D 0%,#19466E 65%,#2B6597 100%);
+  padding:26px 30px; border-radius:17px; margin-bottom:22px;
+  box-shadow:0 8px 22px rgba(21,52,81,.10);
 }
-
-[data-testid="stDataFrame"] {
-    padding: 4px;
-}
-
-/* ===== INPUTS AND SELECTBOXES ===== */
-div[data-baseweb="select"] > div,
-div[data-baseweb="input"] > div {
-    background: var(--white);
-    border: 1px solid #D7E1ED;
-    border-radius: 10px;
-    min-height: 42px;
-}
-
-div[data-baseweb="select"] > div:focus-within,
-div[data-baseweb="input"] > div:focus-within {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 2px rgba(57, 120, 197, 0.12);
-}
-
-[data-testid="stTextInput"] label,
-[data-testid="stSelectbox"] label,
-[data-testid="stTextArea"] label {
-    color: var(--navy);
-    font-weight: 600;
-}
-
-/* ===== BUTTONS ===== */
-.stButton > button,
-.stDownloadButton > button {
-    border-radius: 10px;
-    min-height: 42px;
-    padding: 0.5rem 1rem;
-    font-weight: 650;
-    border: 1px solid #D7E1ED;
-    transition: all 0.18s ease;
-}
-
-.stButton > button[kind="primary"],
-.stDownloadButton > button[kind="primary"] {
-    background: var(--navy);
-    color: var(--white);
-    border-color: var(--navy);
-}
-
-.stButton > button:hover,
-.stDownloadButton > button:hover {
-    border-color: var(--blue);
-    color: var(--blue);
-}
-
-/* ===== ALERTS ===== */
-[data-testid="stAlert"] {
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
-
-/* ===== TEXT AREAS ===== */
-textarea {
-    border-radius: 10px !important;
-    border-color: #D7E1ED !important;
-    background: var(--white) !important;
-    line-height: 1.7 !important;
-}
-
-/* ===== EXPANDERS ===== */
-[data-testid="stExpander"] {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-[data-testid="stExpander"] summary {
-    color: var(--navy);
-    font-weight: 650;
-}
-
-/* ===== CHART CONTAINERS ===== */
-[data-testid="stVegaLiteChart"],
-[data-testid="stArrowVegaLiteChart"],
-[data-testid="stPyplot"] {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 12px;
-}
-
-/* ===== SIDEBAR ===== */
-[data-testid="stSidebar"] {
-    background: #FFFFFF;
-    border-right: 1px solid var(--border);
-}
-
-[data-testid="stSidebar"] > div:first-child {
-    padding-top: 1.5rem;
-}
-
-[data-testid="stSidebar"] h1,
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3 {
-    color: var(--navy) !important;
-}
-
-/* ===== LINKS AND CHECKBOXES ===== */
-a {
-    color: var(--blue);
-}
-
-[data-testid="stCheckbox"] label {
-    color: var(--text);
-}
-
-/* ===== RESPONSIVE LAYOUT ===== */
-@media (max-width: 900px) {
-    [data-testid="stMainBlockContainer"] {
-        padding: 1.2rem 1rem 2rem;
-    }
-
-    [data-testid="stMetric"] {
-        padding: 15px;
-    }
-
-    [data-testid="stMetricValue"] {
-        font-size: 1.45rem !important;
-    }
-}
-
-@media (max-width: 600px) {
-    [data-testid="stMainBlockContainer"] {
-        padding: 0.8rem 0.7rem 1.5rem;
-    }
-
-    h1 {
-        font-size: 1.7rem !important;
-    }
-
-    h2 {
-        font-size: 1.35rem !important;
-    }
+.hero-kicker { color:#BBD8F4; font-size:11px; font-weight:750; letter-spacing:1.8px; }
+.hero-title { color:white; font-size:28px; font-weight:820; margin-top:8px; line-height:1.3; }
+.hero-sub { color:#D8E6F5; font-size:14px; margin-top:8px; }
+.section-note { color:#6B7C90; margin-top:-8px; margin-bottom:18px; font-size:14px; }
+.small-pill { display:inline-block; background:#EAF2FA; color:#244F7C; border-radius:20px; padding:4px 10px; font-size:12px; font-weight:700; }
+@media(max-width:700px) {
+ [data-testid="stMainBlockContainer"] { padding:1rem .8rem 2rem; }
+ .hero { padding:20px; } .hero-title { font-size:23px; }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
+# =========================================================
+# DATA HELPERS
+# =========================================================
+def find_file(candidates):
+    for folder in DATA_DIRS:
+        for name in candidates:
+            path = folder / name
+            if path.exists():
+                return path
+    return None
+
+@st.cache_data(show_spinner=False)
+def read_excel(path_string, modified_time):
+    return pd.read_excel(path_string)
+
+def load_table(key):
+    path = find_file(FILES[key])
+    if not path:
+        return pd.DataFrame(), None
+    try:
+        return read_excel(str(path), path.stat().st_mtime), path
+    except Exception as exc:
+        st.warning(f"Không đọc được file {path.name}: {exc}")
+        return pd.DataFrame(), path
+
+tickets, tickets_path = load_table("tickets")
+analysis, analysis_path = load_table("analysis")
+routing, routing_path = load_table("routing")
+rag, rag_path = load_table("rag")
+classified, classified_path = load_table("classified")
+
+def norm_bool(series):
+    return series.astype(str).str.strip().str.lower().isin(["true", "1", "yes", "urgent", "high", "khẩn cấp"])
+
+def col_series(frame, col, default=""):
+    if col in frame.columns:
+        return frame[col]
+    return pd.Series([default] * len(frame), index=frame.index)
+
+def safe_text(value, fallback="—"):
+    if pd.isna(value) or str(value).strip() in ("", "nan", "None"):
+        return fallback
+    return str(value)
+
+def match_ticket(frame, ticket_id):
+    if frame.empty or "ticket_id" not in frame.columns:
+        return pd.DataFrame()
+    return frame[frame["ticket_id"].astype(str) == str(ticket_id)]
+
+def display_field(frame, row, field, label=None):
+    label = label or field.replace("_", " ").title()
+    st.markdown(f"**{label}**")
+    st.write(safe_text(row.get(field, "—")))
+
+def to_excel_bytes(frame):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        frame.to_excel(writer, index=False, sheet_name="Classified Output")
+    return output.getvalue()
+
+# =========================================================
+# SIDEBAR NAVIGATION
+# =========================================================
+with st.sidebar:
+    st.markdown("## 🏦 Intelligent CS")
+    st.caption("Customer Operations Workspace")
+    st.divider()
+    page = st.radio(
+        "ĐIỀU HƯỚNG",
+        [
+            "Dashboard Overview",
+            "Ticket Management",
+            "AI Analysis & Review",
+            "Management Analytics",
+            "Classified Output",
+        ],
+        label_visibility="visible",
+    )
+    st.divider()
+    st.caption("DATA STATUS")
+    for label, frame, path in [
+        ("Tickets", tickets, tickets_path),
+        ("AI Analysis", analysis, analysis_path),
+        ("Routing tests", routing, routing_path),
+        ("RAG tests", rag, rag_path),
+        ("Classified data", classified, classified_path),
+    ]:
+        if path:
+            st.markdown(f"**{label}:** {len(frame):,} rows")
+        else:
+            st.markdown(f"**{label}:** chưa tìm thấy")
+
+# =========================================================
 # HEADER
-# =========================
-
-# =========================
-# MODERN APP HEADER
-# =========================
-
+# =========================================================
 st.markdown("""
-<div style="
-    background: linear-gradient(125deg, #12243A 0%, #1B426B 65%, #285B8B 100%);
-    padding: 30px 32px;
-    border-radius: 18px;
-    margin-bottom: 26px;
-    box-shadow: 0 10px 28px rgba(20, 45, 78, 0.12);
-    position: relative;
-    overflow: hidden;
-">
-    <div style="
-        color: #A9D0F5;
-        font-size: 11px;
-        font-weight: 750;
-        letter-spacing: 2px;
-        margin-bottom: 12px;
-    ">
-        CUSTOMER OPERATIONS WORKSPACE
-    </div>
-    <div style="
-        color: #FFFFFF;
-        font-size: 30px;
-        font-weight: 800;
-        line-height: 1.3;
-        letter-spacing: -0.8px;
-    ">
-        🏦 Intelligent Customer Service
-    </div>
-    <div style="
-        color: #D7E6F5;
-        font-size: 14px;
-        margin-top: 10px;
-        line-height: 1.7;
-    ">
-        AI-powered insights for smarter customer service operations
-    </div>
+<div class="hero">
+  <div class="hero-kicker">CUSTOMER OPERATIONS WORKSPACE</div>
+  <div class="hero-title">🏦 Intelligent Customer Service</div>
+  <div class="hero-sub">AI-assisted ticket analysis, prioritization and customer feedback insights</div>
 </div>
 """, unsafe_allow_html=True)
 
-# =========================
-# LOAD DATA
-# =========================
+if tickets.empty:
+    st.error(
+        "Chưa tìm thấy dữ liệu ticket. Hãy đặt tickets.xlsx trong cùng thư mục với dashboard.py "
+        "hoặc trong thư mục data/."
+    )
+    st.stop()
 
-from pathlib import Path
+# Derived ticket fields
+urgent_mask = norm_bool(col_series(tickets, "is_urgent", "false"))
+urgent_count = int(urgent_mask.sum())
+complaint_count = int(col_series(tickets, "category", "").astype(str).str.lower().eq("complaint").sum())
+negative_count = int(col_series(tickets, "sentiment", "").astype(str).str.lower().eq("negative").sum())
+top_category = col_series(tickets, "category", "").dropna().astype(str)
+top_category = top_category.value_counts().index[0] if not top_category.empty else "N/A"
 
-BASE_DIR = Path(__file__).resolve().parent
+# =========================================================
+# PAGE 1: DASHBOARD
+# =========================================================
+if page == "Dashboard Overview":
+    st.title("Dashboard Overview")
+    st.markdown('<div class="section-note">Tổng quan nhanh để xác định khối lượng công việc và những trường hợp cần ưu tiên.</div>', unsafe_allow_html=True)
 
-def load_excel(filename):
-    file_path = BASE_DIR / filename
-    if not file_path.exists():
-        st.error(f"Không tìm thấy file: {file_path}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🎫 Total tickets", f"{len(tickets):,}")
+    c2.metric("🚨 Urgent tickets", f"{urgent_count:,}", f"{urgent_count / max(len(tickets),1):.1%} of total")
+    c3.metric("📣 Complaints", f"{complaint_count:,}")
+    c4.metric("🏷️ Most common category", top_category)
+
+    st.markdown("### Work queue")
+    q1, q2 = st.columns([1, 2])
+    with q1:
+        st.markdown("#### Priority action")
+        st.write("Mở danh sách các ticket đang được đánh dấu khẩn cấp để kiểm tra trước.")
+        if st.button("🚨 View urgent tickets", type="primary", use_container_width=True):
+            st.session_state["ticket_urgent_only"] = True
+            st.session_state["nav_target"] = "Ticket Management"
+            st.rerun()
+        if st.button("📋 View all tickets", use_container_width=True):
+            st.session_state["ticket_urgent_only"] = False
+            st.session_state["nav_target"] = "Ticket Management"
+            st.rerun()
+    with q2:
+        st.markdown("#### Ticket distribution")
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            st.caption("Tickets by category")
+            if "category" in tickets.columns:
+                st.bar_chart(tickets["category"].fillna("Unknown").astype(str).value_counts().head(8))
+            else:
+                st.info("Không có cột category trong dữ liệu.")
+        with chart_col2:
+            st.caption("Tickets by type")
+            if "ticket_type" in tickets.columns:
+                st.bar_chart(tickets["ticket_type"].fillna("Unknown").astype(str).value_counts().head(8))
+            else:
+                st.info("Không có cột ticket_type trong dữ liệu.")
+
+    st.markdown("### Recent / urgent tickets")
+    preview = tickets.copy()
+    if "is_urgent" in preview.columns:
+        preview["_urgent_sort"] = norm_bool(preview["is_urgent"]).astype(int)
+        preview = preview.sort_values("_urgent_sort", ascending=False).drop(columns="_urgent_sort")
+    preferred = [c for c in ["ticket_id", "created_at", "category", "ticket_type", "topic", "sentiment", "is_urgent"] if c in preview.columns]
+    st.dataframe(preview[preferred] if preferred else preview, use_container_width=True, hide_index=True)
+
+# =========================================================
+# PAGE 2: TICKET MANAGEMENT
+# =========================================================
+elif page == "Ticket Management":
+    st.title("Ticket Management")
+    st.markdown('<div class="section-note">Tìm kiếm, lọc và mở một ticket để xem nội dung khách hàng cùng thông tin xử lý.</div>', unsafe_allow_html=True)
+
+    search_col, cat_col, type_col, urgent_col = st.columns([2, 1, 1, 1])
+    with search_col:
+        query = st.text_input("Search ticket", placeholder="Nhập ticket ID hoặc từ khóa trong nội dung...")
+    with cat_col:
+        cats = ["All"] + sorted(col_series(tickets, "category", "").dropna().astype(str).unique().tolist())
+        category = st.selectbox("Category", cats)
+    with type_col:
+        types = ["All"] + sorted(col_series(tickets, "ticket_type", "").dropna().astype(str).unique().tolist())
+        ticket_type = st.selectbox("Ticket type", types)
+    with urgent_col:
+        urgency_filter = st.selectbox("Priority", ["All", "Urgent only", "Non-urgent"])
+
+    filtered = tickets.copy()
+    if query.strip():
+        message = col_series(filtered, "customer_message", "").astype(str)
+        ids = col_series(filtered, "ticket_id", "").astype(str)
+        filtered = filtered[message.str.contains(query, case=False, na=False) | ids.str.contains(query, case=False, na=False)]
+    if category != "All" and "category" in filtered.columns:
+        filtered = filtered[filtered["category"].astype(str) == category]
+    if ticket_type != "All" and "ticket_type" in filtered.columns:
+        filtered = filtered[filtered["ticket_type"].astype(str) == ticket_type]
+    if urgency_filter != "All" and "is_urgent" in filtered.columns:
+        mask = norm_bool(filtered["is_urgent"])
+        filtered = filtered[mask] if urgency_filter == "Urgent only" else filtered[~mask]
+    if st.session_state.get("ticket_urgent_only", False) and "is_urgent" in filtered.columns:
+        filtered = filtered[norm_bool(filtered["is_urgent"])]
+        st.info("Đang bật chế độ chỉ xem ticket khẩn cấp.")
+    if st.button("Clear urgent shortcut"):
+        st.session_state["ticket_urgent_only"] = False
+        st.rerun()
+
+    st.caption(f"Hiển thị {len(filtered):,} / {len(tickets):,} ticket")
+    cols = [c for c in ["ticket_id", "created_at", "category", "ticket_type", "topic", "sentiment", "is_urgent", "customer_message"] if c in filtered.columns]
+    st.dataframe(filtered[cols] if cols else filtered, use_container_width=True, hide_index=True, height=320)
+
+    if "ticket_id" in filtered.columns and not filtered.empty:
+        ids = filtered["ticket_id"].astype(str).tolist()
+        default_id = st.session_state.get("selected_ticket_id", ids[0])
+        if default_id not in ids:
+            default_id = ids[0]
+        selected = st.selectbox("Open ticket details", ids, index=ids.index(default_id))
+        st.session_state["selected_ticket_id"] = selected
+        row = filtered[filtered["ticket_id"].astype(str) == selected].iloc[0]
+
+        st.divider()
+        st.subheader(f"Ticket detail · {selected}")
+        st.markdown("**Customer message**")
+        st.info(safe_text(row.get("customer_message", "Không có nội dung khách hàng.")))
+        detail_cols = st.columns(4)
+        for i, field in enumerate(["category", "ticket_type", "is_urgent", "created_at"]):
+            with detail_cols[i]:
+                display_field(tickets, row, field)
+        with st.expander("View all original ticket fields"):
+            st.json({str(k): safe_text(v) for k, v in row.to_dict().items()})
+    else:
+        st.warning("Không có ticket nào khớp với bộ lọc.")
+
+# =========================================================
+# PAGE 3: AI ANALYSIS & HUMAN REVIEW
+# =========================================================
+elif page == "AI Analysis & Review":
+    st.title("AI Analysis & Human Review")
+    st.markdown('<div class="section-note">Quy trình: hiểu yêu cầu → kiểm tra mức độ ưu tiên → tham khảo Knowledge Base → chỉnh sửa bản nháp → quyết định của nhân viên.</div>', unsafe_allow_html=True)
+
+    if "ticket_id" not in tickets.columns:
+        st.warning("File tickets cần có cột ticket_id.")
         st.stop()
-    return pd.read_excel(file_path)
+    ticket_ids = tickets["ticket_id"].astype(str).tolist()
+    current = st.session_state.get("selected_ticket_id", ticket_ids[0])
+    if current not in ticket_ids:
+        current = ticket_ids[0]
+    selected = st.selectbox("Select ticket to review", ticket_ids, index=ticket_ids.index(current))
+    st.session_state["selected_ticket_id"] = selected
+    ticket_row = tickets[tickets["ticket_id"].astype(str) == selected].iloc[0]
 
-df = load_excel("tickets.xlsx")
-analysis_df = load_excel("tickets_analyzed.xlsx")
-routing_df = load_excel("test_routing.xlsx")
-rag_df = load_excel("test_rag.xlsx")
-classified_df = load_excel("Copy of classified_feedback.xlsx")
+    st.markdown("#### 1. Customer request")
+    st.info(safe_text(ticket_row.get("customer_message", "No customer message available.")))
+    arow_df = match_ticket(analysis, selected)
+    arow = arow_df.iloc[0] if not arow_df.empty else pd.Series(dtype=object)
 
-# =========================
-# DASHBOARD OVERVIEW
-# =========================
+    with st.expander("2. AI Analysis", expanded=True):
+        if arow_df.empty:
+            st.info("Không tìm thấy kết quả AI Analysis cho ticket này trong file phân tích.")
+        else:
+            fields = ["intent", "topic", "product", "amount", "channel", "transaction_time", "transaction_id", "sentiment", "missing_information", "note"]
+            existing = [f for f in fields if f in arow.index]
+            cols = st.columns(3)
+            for i, field in enumerate(existing):
+                with cols[i % 3]:
+                    display_field(analysis, arow, field)
 
-st.markdown("""
-<div style="margin: 8px 0 20px 0;">
-    <div style="
-        color: #173D67;
-        font-size: 23px;
-        font-weight: 750;
-        margin-bottom: 6px;
-    ">
-        Dashboard Overview
-    </div>
-    <div style="
-        color: #718096;
-        font-size: 14px;
-    ">
-        Tổng quan tình hình tiếp nhận và xử lý yêu cầu khách hàng
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    with st.expander("3. Priority & Routing", expanded=True):
+        # Routing file is a test report and may not be keyed to production ticket IDs.
+        if routing.empty:
+            st.info("Chưa có file routing test.")
+        else:
+            st.caption("Routing test results are shown separately because test_id may not correspond to a production ticket_id.")
+            if "test_id" in routing.columns:
+                test_ids = routing["test_id"].dropna().astype(str).tolist()
+                chosen_test = st.selectbox("Routing test case", test_ids, key="routing_test_case")
+                rr = routing[routing["test_id"].astype(str) == chosen_test].iloc[0]
+            else:
+                rr = routing.iloc[0]
+            route_fields = ["expected_priority", "actual_priority", "urgency", "expected_department", "actual_department", "routing_reason", "both_correct"]
+            existing = [f for f in route_fields if f in rr.index]
+            cols = st.columns(3)
+            for i, field in enumerate(existing):
+                with cols[i % 3]:
+                    display_field(routing, rr, field)
 
-col1, col2, col3 = st.columns(3, gap="medium")
+    with st.expander("4. Knowledge Base & Draft Response", expanded=True):
+        if rag.empty:
+            st.info("Chưa có file RAG test.")
+            draft_default = ""
+        else:
+            if "test_id" in rag.columns:
+                rag_ids = rag["test_id"].dropna().astype(str).tolist()
+                chosen_rag = st.selectbox("RAG test case", rag_ids, key="rag_test_case")
+                rrow = rag[rag["test_id"].astype(str) == chosen_rag].iloc[0]
+            else:
+                rrow = rag.iloc[0]
+            rag_cols = st.columns(2)
+            with rag_cols[0]:
+                for field in ["actual_kb_found", "actual_source", "actual_confidence"]:
+                    if field in rrow.index:
+                        display_field(rag, rrow, field)
+            with rag_cols[1]:
+                for field in ["actual_reason", "expected_faq_source", "test_result"]:
+                    if field in rrow.index:
+                        display_field(rag, rrow, field)
+            draft_default = safe_text(rrow.get("actual_draft_response", ""), "")
+        draft_key = f"draft_{selected}"
+        if draft_key not in st.session_state:
+            st.session_state[draft_key] = draft_default
+        edited_draft = st.text_area("AI draft — review and edit before approval", key=draft_key, height=180, placeholder="Bản nháp phản hồi sẽ xuất hiện tại đây nếu có trong dữ liệu.")
+        st.caption("Lưu ý: đây là bản nháp để nhân viên rà soát; ứng dụng không tự gửi phản hồi cho khách hàng.")
 
-with col1:
-    st.metric(
-        label="🎫 Total Tickets",
-        value=len(df),
-        help="Tổng số ticket trong dữ liệu hiện có"
-    )
+    st.markdown("#### 5. Human Review")
+    status_key = f"review_status_{selected}"
+    review_note_key = f"review_note_{selected}"
+    st.session_state.setdefault(status_key, "Pending review")
+    st.session_state.setdefault(review_note_key, "")
+    review_note = st.text_area("Reviewer note (optional)", key=review_note_key, placeholder="Ghi chú chỉnh sửa, lý do chuyển cấp hoặc thông tin cần xác minh...")
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        if st.button("✏️ Save as edited", use_container_width=True):
+            st.session_state[status_key] = "Edited"
+            st.success("Đã lưu trạng thái trong phiên làm việc hiện tại.")
+    with b2:
+        if st.button("✅ Approve draft", type="primary", use_container_width=True):
+            st.session_state[status_key] = "Approved"
+            st.success("Đã đánh dấu bản nháp là Approved trong phiên làm việc hiện tại.")
+    with b3:
+        if st.button("⚠️ Escalate", use_container_width=True):
+            st.session_state[status_key] = "Escalated"
+            st.warning("Đã đánh dấu ticket cần chuyển cấp trong phiên làm việc hiện tại.")
+    st.markdown(f"**Current review status:** `{st.session_state[status_key]}`")
+    st.caption("Trạng thái review hiện được giữ trong session của ứng dụng; muốn lưu lâu dài giữa các phiên hoặc cho nhiều nhân viên cần kết nối database.")
 
-with col2:
-    if "is_urgent" in df.columns:
-        urgent_count = df["is_urgent"].astype(str).str.lower().isin(
-            ["true", "1", "yes", "urgent"]
-        ).sum()
+# =========================================================
+# PAGE 4: MANAGEMENT ANALYTICS
+# =========================================================
+elif page == "Management Analytics":
+    st.title("Management & Analytics")
+    st.markdown('<div class="section-note">Tổng hợp KPI, cơ cấu vấn đề, cảm xúc khách hàng và xu hướng khiếu nại.</div>', unsafe_allow_html=True)
+
+    total = len(tickets)
+    sentiment_series = col_series(tickets, "sentiment", "").astype(str).str.lower()
+    negative = int(sentiment_series.eq("negative").sum())
+    urgent_pct = urgent_count / max(total, 1) * 100
+    negative_pct = negative / max(total, 1) * 100
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total tickets", f"{total:,}")
+    k2.metric("Urgent tickets", f"{urgent_count:,}", f"{urgent_pct:.1f}%")
+    k3.metric("Negative sentiment", f"{negative:,}", f"{negative_pct:.1f}%")
+    k4.metric("Most common category", top_category)
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### Topic distribution")
+        if "topic" in tickets.columns:
+            topic_counts = tickets["topic"].fillna("Unknown").astype(str).value_counts()
+            st.bar_chart(topic_counts.head(10))
+        elif not classified.empty and "topic" in classified.columns:
+            st.bar_chart(classified["topic"].fillna("Unknown").astype(str).value_counts().head(10))
+        else:
+            st.info("Không tìm thấy cột topic trong dữ liệu hiện có.")
+    with right:
+        st.markdown("### Sentiment distribution")
+        if "sentiment" in tickets.columns:
+            st.bar_chart(tickets["sentiment"].fillna("Unknown").astype(str).value_counts())
+        elif "sentiment" in classified.columns:
+            st.bar_chart(classified["sentiment"].fillna("Unknown").astype(str).value_counts())
+        else:
+            st.info("Không tìm thấy cột sentiment trong dữ liệu hiện có.")
+
+    st.markdown("### Complaint trend")
+    if "created_at" in tickets.columns and "category" in tickets.columns:
+        trend = tickets.copy()
+        trend["created_at"] = pd.to_datetime(trend["created_at"], errors="coerce")
+        trend = trend[trend["category"].astype(str).str.lower().eq("complaint")].dropna(subset=["created_at"])
+        if not trend.empty:
+            trend["Date"] = trend["created_at"].dt.date
+            daily = trend.groupby("Date").size().rename("Complaints")
+            st.line_chart(daily)
+        else:
+            st.info("Chưa có dữ liệu ngày hợp lệ cho khiếu nại.")
     else:
-        urgent_count = 0
+        st.info("Cần có created_at và category để hiển thị xu hướng khiếu nại.")
 
-    st.metric(
-        label="🚨 Urgent Tickets",
-        value=urgent_count,
-        help="Số ticket được đánh dấu khẩn cấp"
-    )
+    with st.expander("Root-cause hypotheses and limitations"):
+        st.markdown("""
+- **Transfer:** kiểm tra trạng thái giao dịch, thời gian đối soát và thông tin người nhận.
+- **Card/Fraud:** rà soát quy trình khóa thẻ, xác minh danh tính và cảnh báo giao dịch.
+- **Negative/Urgent:** đối chiếu ticket với log hệ thống và lịch sử xử lý.
 
-with col3:
-    if "category" in df.columns:
-        category_count = df["category"].nunique()
-    else:
-        category_count = 0
+Đây là các giả thuyết cần điều tra, không phải kết luận nguyên nhân. Topic, sentiment và urgency chỉ là tín hiệu; cần bằng chứng vận hành để xác nhận.
+""")
 
-    st.metric(
-        label="📂 Categories",
-        value=category_count,
-        help="Số nhóm Category khác nhau trong dữ liệu"
-    )
+    st.markdown("### Export management snapshot")
+    summary = pd.DataFrame([
+        {"Metric": "Total tickets", "Value": total},
+        {"Metric": "Urgent tickets", "Value": urgent_count},
+        {"Metric": "Complaints", "Value": complaint_count},
+        {"Metric": "Negative sentiment", "Value": negative},
+        {"Metric": "Most common category", "Value": top_category},
+    ])
+    st.download_button("Download KPI summary (CSV)", summary.to_csv(index=False).encode("utf-8-sig"),
+                       "management_summary.csv", "text/csv")
 
-st.caption(
-    "Các chỉ số được tính trực tiếp từ dữ liệu ticket hiện có."
-)
+# =========================================================
+# PAGE 5: CLASSIFIED OUTPUT
+# =========================================================
+elif page == "Classified Output":
+    st.title("Classified Output")
+    st.markdown('<div class="section-note">Tra cứu dữ liệu đã phân loại, lọc theo thuộc tính và xuất kết quả để phục vụ báo cáo.</div>', unsafe_allow_html=True)
 
-# =========================
-# TICKET LIST
-# =========================
+    source = classified.copy() if not classified.empty else (analysis.copy() if not analysis.empty else tickets.copy())
+    if source.empty:
+        st.warning("Không có dữ liệu Classified Output để hiển thị.")
+        st.stop()
 
-st.divider()
+    filter_fields = [f for f in ["topic", "sentiment", "urgency", "category", "is_urgent"] if f in source.columns]
+    filter_cols = st.columns(min(max(len(filter_fields), 1), 4))
+    active_filters = {}
+    for i, field in enumerate(filter_fields):
+        options = ["All"] + sorted(source[field].dropna().astype(str).unique().tolist())
+        with filter_cols[i % len(filter_cols)]:
+            active_filters[field] = st.selectbox(f"Filter by {field.replace('_',' ').title()}", options, key=f"classified_{field}")
+    filtered = source.copy()
+    for field, value in active_filters.items():
+        if value != "All":
+            filtered = filtered[filtered[field].astype(str) == value]
 
-st.subheader("🔎 Ticket Filters")
+    search = st.text_input("Search within classified data", placeholder="Ticket ID, topic, keyword...")
+    if search.strip():
+        search_mask = filtered.astype(str).apply(lambda s: s.str.contains(search, case=False, na=False)).any(axis=1)
+        filtered = filtered[search_mask]
 
-col1, col2 = st.columns(2)
+    st.metric("Matching records", f"{len(filtered):,}")
+    st.dataframe(filtered, use_container_width=True, hide_index=True, height=430)
 
-with col1:
-    if "category" in df.columns:
-        category_options = ["All"] + sorted(
-            df["category"].dropna().astype(str).unique().tolist()
+    d1, d2 = st.columns(2)
+    with d1:
+        st.download_button(
+            "⬇️ Download filtered CSV",
+            data=filtered.to_csv(index=False).encode("utf-8-sig"),
+            file_name="classified_output.csv",
+            mime="text/csv",
+            use_container_width=True,
+            type="primary",
         )
-        selected_category = st.selectbox(
-            "Filter by Category",
-            category_options
-        )
-    else:
-        selected_category = "All"
-
-with col2:
-    if "ticket_type" in df.columns:
-        ticket_type_options = ["All"] + sorted(
-            df["ticket_type"].dropna().astype(str).unique().tolist()
-        )
-        selected_ticket_type = st.selectbox(
-            "Filter by Ticket Type",
-            ticket_type_options
-        )
-    else:
-        selected_ticket_type = "All"
-
-filtered_df = df.copy()
-
-if selected_category != "All":
-    filtered_df = filtered_df[
-        filtered_df["category"].astype(str) == selected_category
-    ]
-
-if selected_ticket_type != "All":
-    filtered_df = filtered_df[
-        filtered_df["ticket_type"].astype(str) == selected_ticket_type
-    ]
-
-st.subheader("📋 Customer Ticket List")
-st.dataframe(
-    filtered_df,
-    use_container_width=True,
-    hide_index=True
-)
-# =========================
-# TICKET DETAIL
-# =========================
-
-st.divider()
-
-st.subheader("🔎 Ticket Detail")
-
-# Tạo danh sách ticket ID
-ticket_ids = df["ticket_id"].astype(str).tolist()
-
-selected_ticket = st.selectbox(
-    "Select a ticket",
-    ticket_ids
-)
-
-# Lấy ticket được chọn
-selected_row = df[
-    df["ticket_id"].astype(str) == selected_ticket
-].iloc[0]
-
-# =========================
-# CUSTOMER MESSAGE
-# =========================
-
-st.markdown("### 💬 Customer Message")
-
-st.info(selected_row["customer_message"])
-
-# =========================
-# BASIC INFORMATION
-# =========================
-
-st.markdown("### 📌 Ticket Information")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.write("**Ticket ID**")
-    st.write(selected_row["ticket_id"])
-
-with col2:
-    st.write("**Category**")
-    st.write(selected_row["category"])
-
-with col3:
-    st.write("**Ticket Type**")
-    st.write(selected_row["ticket_type"])
-
-# =========================
-# URGENCY
-# =========================
-
-st.markdown("### 🚨 Urgency")
-
-st.write(selected_row["is_urgent"])
-
-# =========================
-# AI ANALYSIS
-# =========================
-
-st.divider()
-st.subheader("🤖 AI Analysis")
-
-if "ticket_id" in analysis_df.columns and "ticket_id" in df.columns:
-    analysis_match = analysis_df[
-        analysis_df["ticket_id"].astype(str) == str(selected_ticket)
-    ]
-
-    if not analysis_match.empty:
-        analysis_row = analysis_match.iloc[0]
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            for field in ["intent", "topic", "product", "amount", "channel"]:
-                st.write(f"**{field.replace('_', ' ').title()}**")
-                st.info(str(analysis_row.get(field, "N/A")))
-
-        with col2:
-            for field in [
-                "transaction_time",
-                "transaction_id",
-                "sentiment",
-                "missing_information"
-            ]:
-                st.write(f"**{field.replace('_', ' ').title()}**")
-                st.info(str(analysis_row.get(field, "N/A")))
-
-    else:
-        st.warning("Không tìm thấy kết quả AI Analysis cho ticket này.")
-else:
-    st.warning("File AI Analysis chưa có cột ticket_id.")
-
-# =========================
-# PRIORITY & ROUTING
-# =========================
-
-st.divider()
-st.subheader("🚦 Priority & Routing")
-
-if not routing_df.empty:
-    if "test_id" in routing_df.columns:
-        test_options = routing_df["test_id"].dropna().astype(str).tolist()
-        selected_test = st.selectbox(
-            "Select Routing Test Case",
-            test_options,
-            key="routing_test_selector"
-        )
-
-        routing_match = routing_df[
-            routing_df["test_id"].astype(str) == selected_test
-        ]
-
-        if not routing_match.empty:
-            routing_row = routing_match.iloc[0]
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.write("**Expected Priority**")
-                st.info(str(routing_row.get("expected_priority", "N/A")))
-
-                st.write("**Actual Priority**")
-                st.info(str(routing_row.get("actual_priority", "N/A")))
-
-                st.write("**Urgency**")
-                st.info(str(routing_row.get("urgency", "N/A")))
-
-            with col2:
-                st.write("**Expected Department**")
-                st.info(str(routing_row.get("expected_department", "N/A")))
-
-                st.write("**Actual Department**")
-                st.info(str(routing_row.get("actual_department", "N/A")))
-
-                st.write("**Routing Reason**")
-                st.info(str(routing_row.get("routing_reason", "N/A")))
-
-    st.markdown("### 📋 Routing Test Results")
-    st.dataframe(routing_df, use_container_width=True, hide_index=True)
-
-    if "both_correct" in routing_df.columns:
-        correct_count = (
-            routing_df["both_correct"].astype(str).str.lower()
-            .isin(["true", "1", "yes"])
-        ).sum()
-        st.metric("Test Cases with Correct Priority and Department",
-                  f"{correct_count}/{len(routing_df)}")
-else:
-    st.warning("File test_routing.xlsx không có dữ liệu.")
-
-# =========================
-# KNOWLEDGE BASE & RESPONSE
-# =========================
-
-st.divider()
-st.subheader("📚 Knowledge Base & RAG")
-
-if not rag_df.empty:
-    if "test_id" in rag_df.columns:
-        rag_options = rag_df["test_id"].dropna().astype(str).tolist()
-
-        selected_rag_test = st.selectbox(
-            "Select RAG Test Case",
-            rag_options,
-            key="rag_test_selector"
-        )
-
-        rag_match = rag_df[
-            rag_df["test_id"].astype(str) == selected_rag_test
-        ]
-
-        if not rag_match.empty:
-            rag_row = rag_match.iloc[0]
-
-            st.markdown("### 💬 Customer Message")
-            st.write(rag_row.get("customer_message", "N/A"))
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.write("**Knowledge Base Found**")
-                st.info(str(rag_row.get("actual_kb_found", "N/A")))
-
-                st.write("**Source**")
-                st.info(str(rag_row.get("actual_source", "N/A")))
-
-                st.write("**Confidence**")
-                st.info(str(rag_row.get("actual_confidence", "N/A")))
-
-            with col2:
-                st.write("**Reason**")
-                st.info(str(rag_row.get("actual_reason", "N/A")))
-
-                st.write("**Expected FAQ Source**")
-                st.info(str(rag_row.get("expected_faq_source", "N/A")))
-
-                st.write("**Test Result**")
-                result = str(rag_row.get("test_result", "N/A"))
-                if result.upper() == "PASS":
-                    st.success(result)
-                elif result.upper() == "FAIL":
-                    st.error(result)
-                else:
-                    st.info(result)
-
-            st.markdown("### 📝 Draft Response")
-            st.text_area(
-                "AI-generated draft",
-                value=str(rag_row.get("actual_draft_response", "")),
-                height=150,
-                disabled=True,
-                key="rag_draft_response"
+    with d2:
+        try:
+            excel_data = to_excel_bytes(filtered)
+            st.download_button(
+                "⬇️ Download filtered Excel",
+                data=excel_data,
+                file_name="classified_output.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
             )
-
-    st.markdown("### 📋 All RAG Test Results")
-    st.dataframe(rag_df, use_container_width=True, hide_index=True)
-else:
-    st.warning("File test_rag.xlsx không có dữ liệu.")
-
-# =========================
-# HUMAN REVIEW
-# =========================
+        except Exception as exc:
+            st.warning(f"Không tạo được file Excel: {exc}")
+    st.caption("Lưu ý: chỉ tải xuống và chia sẻ dữ liệu theo quyền được phép; tránh công khai thông tin định danh hoặc dữ liệu giao dịch nhạy cảm.")
 
 st.divider()
-st.subheader("👤 Human Review")
-
-st.write("Review the AI-generated draft before taking action.")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    edit_clicked = st.button(
-        "✏️ Edit",
-        use_container_width=True,
-        key="human_edit"
-    )
-
-with col2:
-    approve_clicked = st.button(
-        "✅ Approve",
-        use_container_width=True,
-        type="primary",
-        key="human_approve"
-    )
-
-with col3:
-    escalate_clicked = st.button(
-        "⚠️ Escalate",
-        use_container_width=True,
-        key="human_escalate"
-    )
-
-if edit_clicked:
-    st.info("Edit mode selected. Human review is required.")
-
-if approve_clicked:
-    st.success("Ticket approved by human reviewer.")
-
-if escalate_clicked:
-    st.warning("Ticket escalated for further review.")
-
-# =========================
-# MANAGEMENT DASHBOARD
-# =========================
-
-st.divider()
-
-st.markdown("""
-<div style="
-    background: linear-gradient(120deg, #102744 0%, #1C4B78 100%);
-    padding: 24px 28px;
-    border-radius: 14px;
-    margin: 12px 0 24px 0;
-">
-    <div style="
-        color: #B9D8F7;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 1.8px;
-        margin-bottom: 8px;
-    ">
-        MANAGEMENT & ANALYTICS
-    </div>
-    <div style="
-        color: #FFFFFF;
-        font-size: 25px;
-        font-weight: 800;
-    ">
-        📊 Management Dashboard
-    </div>
-    <div style="
-        color: #D8E6F5;
-        font-size: 14px;
-        margin-top: 7px;
-    ">
-        Tổng quan hiệu suất, phân loại yêu cầu và xu hướng phản hồi khách hàng
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.subheader("📌 Overview")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Total Tickets", len(df))
-
-with col2:
-    if "category" in df.columns:
-        complaint_count = (
-            df["category"]
-            .astype(str)
-            .str.lower()
-            .eq("complaint")
-            .sum()
-        )
-    else:
-        complaint_count = 0
-
-    st.metric("Complaints", complaint_count)
-
-with col3:
-    if "is_urgent" in df.columns:
-        urgent_count = df["is_urgent"].astype(str).str.lower().isin(
-            ["true", "1", "yes", "urgent"]
-        ).sum()
-    else:
-        urgent_count = 0
-
-    st.metric("Urgent Tickets", urgent_count)
-
-with col4:
-    if "category" in df.columns:
-        top_category = df["category"].value_counts().index[0]
-    else:
-        top_category = "N/A"
-
-    st.metric("Top Issue", top_category)
-
-# =========================
-# MANAGEMENT CHARTS
-# =========================
-
-chart_col1, chart_col2 = st.columns(2, gap="large")
-
-with chart_col1:
-    st.subheader("🔥 Top Customer Issues")
-
-    if "category" in df.columns:
-        category_counts = df["category"].value_counts()
-        st.bar_chart(category_counts)
-
-with chart_col2:
-    st.subheader("📋 Ticket Type Distribution")
-
-    if "ticket_type" in df.columns:
-        ticket_type_counts = df["ticket_type"].value_counts()
-        st.bar_chart(ticket_type_counts)
-
-st.divider()
-
-st.subheader("📈 Complaint Trend")
-
-if "created_at" in df.columns and "category" in df.columns:
-    trend_df = df.copy()
-
-    trend_df["created_at"] = pd.to_datetime(
-        trend_df["created_at"],
-        errors="coerce"
-    )
-
-    trend_df = trend_df[
-        trend_df["category"].astype(str).str.lower() == "complaint"
-    ]
-
-    trend_df = trend_df.dropna(subset=["created_at"])
-    trend_df["date"] = trend_df["created_at"].dt.date
-
-    complaint_trend = trend_df.groupby("date").size()
-
-    st.line_chart(complaint_trend)
-
-else:
-    st.info("Complaint trend data is not available.")
-
-# ============================================================
-# MANAGEMENT SUMMARY — CUSTOMER FEEDBACK DASHBOARD
-# Source: Existing management output
-# ============================================================
-
-import pandas as pd
-import streamlit as st
-
-st.divider()
-st.header("📊 Management Summary — Customer Feedback Dashboard")
-
-st.caption(
-    "Phạm vi dữ liệu: 15/09/2026 – 05/10/2026 | "
-    "Nguồn: Management output có sẵn"
-)
-
-# 1. SCOPE AND KPI
-st.subheader("1. Scope and Key Performance Indicators")
-
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("Total Tickets", "100")
-col2.metric("Urgent Tickets", "24", "24.0%")
-col3.metric("Negative Sentiment", "47", "47.0%")
-col4.metric("Top Topic", "general_inquiry", "19 tickets")
-
-st.info(
-    "Reporting period: 15/09/2026 – 05/10/2026. "
-    "Các chỉ số được lấy từ management output có sẵn."
-)
-
-# 2. TOPIC DISTRIBUTION
-st.subheader("2. Topic Distribution")
-
-topic_data = pd.DataFrame({
-    "Topic": [
-        "general_inquiry",
-        "complaint",
-        "transfer",
-        "card",
-        "fraud",
-        "loan",
-        "account",
-        "digital_banking"
-    ],
-    "Ticket Count": [19, 19, 16, 15, 12, 11, 4, 4],
-    "Percentage": [19, 19, 16, 15, 12, 11, 4, 4]
-})
-
-topic_col, topic_chart_col = st.columns([1, 1.5])
-
-with topic_col:
-    st.dataframe(
-        topic_data,
-        use_container_width=True,
-        hide_index=True
-    )
-
-with topic_chart_col:
-    st.bar_chart(
-        topic_data.set_index("Topic")[["Ticket Count"]],
-        horizontal=True
-    )
-
-# 3. SENTIMENT DISTRIBUTION
-st.subheader("3. Sentiment Distribution")
-
-sentiment_data = pd.DataFrame({
-    "Sentiment": ["neutral", "negative", "positive"],
-    "Ticket Count": [50, 47, 3],
-    "Percentage": ["50.0%", "47.0%", "3.0%"]
-})
-
-sentiment_cols = st.columns(3)
-
-for i, row in sentiment_data.iterrows():
-    sentiment_cols[i].metric(
-        label=row["Sentiment"].capitalize(),
-        value=int(row["Ticket Count"]),
-        delta=row["Percentage"]
-    )
-
-st.bar_chart(
-    sentiment_data.set_index("Sentiment")[["Ticket Count"]],
-    horizontal=True
-)
-
-# 4. DAILY TREND AND SPIKE
-st.subheader("4. Ticket Trend and Spike Detection")
-
-avg_tickets_per_day = 4.76
-spike_threshold = 8.66
-
-trend_col1, trend_col2 = st.columns(2)
-
-trend_col1.metric(
-    "Average Tickets per Day",
-    f"{avg_tickets_per_day:.2f}"
-)
-
-trend_col2.metric(
-    "Spike Reference Threshold",
-    f"{spike_threshold:.2f}"
-)
-
-spike_data = pd.DataFrame({
-    "Date": ["02/10/2026", "03/10/2026"],
-    "Ticket Count": [9, 10]
-})
-
-st.bar_chart(
-    spike_data.set_index("Date")[["Ticket Count"]]
-)
-
-st.warning(
-    "02/10/2026: 9 tickets; 03/10/2026: 10 tickets. "
-    "Cả hai ngày vượt ngưỡng tham chiếu 8.66 tickets/day. "
-    "Đây là tín hiệu cần điều tra, không phải bằng chứng về nguyên nhân."
-)
-
-st.caption(
-    "Lưu ý: Biểu đồ trên chỉ thể hiện hai ngày spike được cung cấp. "
-    "Chưa có dữ liệu từng ngày đầy đủ để vẽ toàn bộ chuỗi thời gian."
-)
-
-# ============================================================
-# 5. ROOT-CAUSE HYPOTHESES
-# ============================================================
-
-st.subheader("5. Root-Cause Hypotheses")
-
-st.caption(
-    "Potential causes for investigation. "
-    "These hypotheses require operational evidence before confirmation."
-)
-
-root_col1, root_col2, root_col3 = st.columns(3)
-
-with root_col1:
-    st.markdown("**Transfer Issues**")
-    st.write(
-        "Review transaction status, reconciliation timing, "
-        "and recipient details to identify possible transfer issues."
-    )
-
-with root_col2:
-    st.markdown("**Card and Fraud Issues**")
-    st.write(
-        "Review card-blocking procedures, identity verification, "
-        "and transaction alerts for relevant cases."
-    )
-
-with root_col3:
-    st.markdown("**Negative or Urgent Tickets**")
-    st.write(
-        "Compare ticket records with system logs and handling history "
-        "before determining the underlying cause."
-    )
-
-st.info(
-    "Important: Ticket topic, sentiment, and urgency are indicators "
-    "for investigation. They do not independently establish root causes."
-)
-
-
-# ============================================================
-# 6. METHODOLOGY AND LIMITATIONS
-# ============================================================
-
-st.subheader("6. Methodology and Limitations")
-
-with st.expander("View methodology and limitations"):
-
-    st.markdown("**1. Topic and Sentiment Analysis**")
-    st.write(
-        "Topic and sentiment labels are taken from the existing "
-        "analysis output. They are not re-predicted in this report."
-    )
-
-    st.markdown("**2. Text Clustering**")
-    st.write(
-        "TF-IDF character features and KMeans are used to group "
-        "textually similar tickets. Similar wording does not prove "
-        "that tickets share the same underlying cause."
-    )
-
-    st.markdown("**3. Spike Detection**")
-    st.write(
-        "The reference threshold is calculated using the mean "
-        "plus 1.5 standard deviations across the reporting period. "
-        "Days with zero tickets are included in the calculation."
-    )
-
-    st.markdown("**4. Interpretation of Spikes**")
-    st.write(
-        "On 02/10/2026, 9 tickets were recorded; on 03/10/2026, "
-        "10 tickets were recorded. Both exceed the reference "
-        "threshold of 8.66 tickets per day. These are signals "
-        "for investigation, not evidence of causation."
-    )
-
-    st.markdown("**5. Data and Verification Limitations**")
-    st.write(
-        "The displayed trend covers only the two spike dates provided, "
-        "not a complete daily time series. Root causes must be verified "
-        "using transaction logs and operational records."
-    )
-# ============================================================
-# CLASSIFIED OUTPUT — FILTER AND VIEW TICKETS
-# ============================================================
-
-st.divider()
-st.header("🗂️ Classified Output")
-
-st.caption(
-    "Filter tickets by topic, sentiment, and urgency."
-)
-
-
-# Check whether the required columns exist
-required_columns = [
-    "ticket_id",
-    "topic",
-    "sentiment",
-    "urgency"
-]
-
-missing_columns = [
-    col for col in required_columns
-    if col not in classified_df.columns
-]
-
-if missing_columns:
-    st.warning(
-        "The Excel file is missing these columns: "
-        + ", ".join(missing_columns)
-    )
-else:
-    df_classified = classified_df.copy()
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        topic_options = ["All"] + sorted(
-            df_classified["topic"].dropna().astype(str).unique().tolist()
-        )
-        selected_topic = st.selectbox(
-            "Filter by Topic",
-            topic_options,
-            key="classified_topic"
-        )
-
-    with col2:
-        sentiment_options = ["All"] + sorted(
-            df_classified["sentiment"].dropna().astype(str).unique().tolist()
-        )
-        selected_sentiment = st.selectbox(
-            "Filter by Sentiment",
-            sentiment_options,
-            key="classified_sentiment"
-        )
-
-    with col3:
-        urgency_options = ["All"] + sorted(
-            df_classified["urgency"].dropna().astype(str).unique().tolist()
-        )
-        selected_urgency = st.selectbox(
-            "Filter by Urgency",
-            urgency_options,
-            key="classified_urgency"
-        )
-
-    if selected_topic != "All":
-        df_classified = df_classified[
-            df_classified["topic"].astype(str) == selected_topic
-        ]
-
-    if selected_sentiment != "All":
-        df_classified = df_classified[
-            df_classified["sentiment"].astype(str) == selected_sentiment
-        ]
-
-    if selected_urgency != "All":
-        df_classified = df_classified[
-            df_classified["urgency"].astype(str) == selected_urgency
-        ]
-
-    st.metric("Matching Tickets", len(df_classified))
-
-    st.dataframe(
-        df_classified,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.download_button(
-        "📥 Download Filtered Tickets (CSV)",
-        data=df_classified.to_csv(index=False).encode("utf-8-sig"),
-        file_name="classified_tickets.csv",
-        mime="text/csv"
-    )
+st.caption("Intelligent Customer Service · Internal review workspace · AI suggestions require human review")
