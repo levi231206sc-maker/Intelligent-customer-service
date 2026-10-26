@@ -334,88 +334,57 @@ if page == "Dashboard Overview":
     st.caption(
         "Theo dõi danh sách ticket và ưu tiên kiểm tra các trường hợp khẩn cấp."
     )
-
     
-# Chuẩn bị dữ liệu và sắp xếp ticket
-preview = tickets.copy()
-
-# Chuẩn hóa ngày tạo để sắp xếp đúng theo thời gian
-if "created_at" in preview.columns:
-    preview["created_at"] = pd.to_datetime(
-        preview["created_at"],
-        errors="coerce"
-    )
-
-# Tạo cột phân loại mức độ khẩn cấp
-if "is_urgent" in preview.columns:
-    preview["_urgent_sort"] = (
-        norm_bool(preview["is_urgent"]).astype(int)
-    )
-else:
-    preview["_urgent_sort"] = 0
-
-# Sắp xếp: khẩn cấp trước, ngày mới nhất trước, mã ticket tăng dần
-sort_columns = ["_urgent_sort"]
-ascending_order = [False]
-
-if "created_at" in preview.columns:
-    sort_columns.append("created_at")
-    ascending_order.append(False)
-
-if "ticket_id" in preview.columns:
-    sort_columns.append("ticket_id")
-    ascending_order.append(True)
-
-preview = preview.sort_values(
-    by=sort_columns,
-    ascending=ascending_order,
-    na_position="last"
-).reset_index(drop=True)
-
-# Tạo danh sách riêng chỉ gồm ticket khẩn cấp
-urgent_preview = preview[
-    preview["_urgent_sort"] == 1
-].copy()
-
-# Đếm số ticket khẩn cấp
-total_urgent = len(urgent_preview)
-
-# Loại bỏ cột phụ trước khi hiển thị
-urgent_preview = urgent_preview.drop(
-    columns=["_urgent_sort"],
-    errors="ignore"
-)
+    # Chuẩn bị dữ liệu và sắp xếp ticket
+    preview = tickets.copy()
     
-    # Hai nút điều hướng
-    action_col1, action_col2, action_col3 = st.columns([1.5, 1, 3])
-
-    with action_col1:
-        if st.button(
-            f"🚨 View urgent cases ({total_urgent})",
-            type="primary",
-            use_container_width=True,
-            key="dashboard_view_urgent",
-        ):
-            st.session_state["ticket_urgent_only"] = True
-            st.session_state["nav_target"] = "Ticket Management"
-            st.rerun()
-
-    with action_col2:
-        if st.button(
-            "📋 View all tickets",
-            use_container_width=True,
-            key="dashboard_view_all",
-        ):
-            st.session_state["ticket_urgent_only"] = False
-            st.session_state["nav_target"] = "Ticket Management"
-            st.rerun()
-
-    with action_col3:
-        st.info(
-            f"Hiện có **{total_urgent} ticket khẩn cấp** "
-            "được đánh dấu trong dữ liệu."
+    # Chuẩn hóa ngày tạo để sắp xếp đúng theo thời gian
+    if "created_at" in preview.columns:
+        preview["created_at"] = pd.to_datetime(
+            preview["created_at"],
+            errors="coerce"
         )
-
+    
+    # Tạo cột phân loại mức độ khẩn cấp
+    if "is_urgent" in preview.columns:
+        preview["_urgent_sort"] = (
+            norm_bool(preview["is_urgent"]).astype(int)
+        )
+    else:
+        preview["_urgent_sort"] = 0
+    
+    # Sắp xếp: khẩn cấp trước, ngày mới nhất trước, mã ticket tăng dần
+    sort_columns = ["_urgent_sort"]
+    ascending_order = [False]
+    
+    if "created_at" in preview.columns:
+        sort_columns.append("created_at")
+        ascending_order.append(False)
+    
+    if "ticket_id" in preview.columns:
+        sort_columns.append("ticket_id")
+        ascending_order.append(True)
+    
+    preview = preview.sort_values(
+        by=sort_columns,
+        ascending=ascending_order,
+        na_position="last"
+    ).reset_index(drop=True)
+    
+    # Tạo danh sách riêng chỉ gồm ticket khẩn cấp
+    urgent_preview = preview[
+        preview["_urgent_sort"] == 1
+    ].copy()
+    
+    # Đếm số ticket khẩn cấp
+    total_urgent = len(urgent_preview)
+    
+    # Loại bỏ cột phụ trước khi hiển thị
+    urgent_preview = urgent_preview.drop(
+        columns=["_urgent_sort"],
+        errors="ignore"
+    )
+        
     # Bảng ticket ngay trên Dashboard
     st.markdown("#### Ticket list")
 
