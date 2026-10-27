@@ -706,6 +706,258 @@ elif page == "Ticket Management":
 # =========================================================
 # PAGE 3: AI ANALYSIS & HUMAN REVIEW
 # =========================================================
+elif page == "AI Analysis & Review":
+    st.title("AI Analysis & Review")
+    page_note(
+        "Kiểm tra phân tích AI, kết quả routing, kiến thức truy xuất và bản nháp "
+        "trước khi nhân viên đưa ra quyết định."
+    )
+
+    if "ticket_id" not in tickets.columns:
+        st.warning("File tickets cần có cột ticket_id.")
+        st.stop()
+
+    ticket_ids = tickets["ticket_id"].dropna().astype(str).tolist()
+    if not ticket_ids:
+        st.warning("Chưa có ticket để phân tích.")
+        st.stop()
+
+    current = st.session_state.get("selected_ticket_id", ticket_ids[0])
+    if current not in ticket_ids:
+        current = ticket_ids[0]
+
+    selected = st.selectbox(
+        "Select ticket to review",
+        ticket_ids,
+        index=ticket_ids.index(current),
+        key="analysis_selected_ticket",
+    )
+    st.session_state["selected_ticket_id"] = selected
+
+    ticket_row = tickets[tickets["ticket_id"].astype(str) == selected].iloc[0]
+
+    st.markdown("### Customer Request")
+    st.info(safe_text(ticket_row.get("customer_message", "No customer message available.")))
+
+    analysis_rows = match_ticket(analysis, selected)
+    arow = analysis_rows.iloc[0] if not analysis_rows.empty else pd.Series(dtype=object)
+
+    st.divider()
+    st.markdown("### AI Analysis")
+    st.caption("Ý định, chủ đề, cảm xúc và thông tin được nhận diện trong yêu cầu.")
+
+    if analysis_rows.empty:
+        st.info("Không tìm thấy kết quả AI Analysis cho ticket này trong file phân tích.")
+    else:
+        fields = [
+            "intent", "topic", "product", "amount", "channel",
+            "transaction_time", "transaction_id", "sentiment",
+            "missing_information", "note",
+        ]
+        existing = [field for field in fields if field in arow.index]
+        cols = st.columns(3)
+        for i, field in enumerate(existing):
+            with cols[i % 3]:
+                display_field(arow, field)
+
+    st.divider()
+    st.markdown("### Priority & Routing")
+    st.caption("Kết quả kiểm thử định tuyến; test case không nhất thiết là ticket thực tế.")
+
+    if routing.empty:
+        st.info("Chưa có file routing test.")
+    else:
+        if "test_id" in routing.columns:
+            test_ids = routing["test_id"].dropna().astype(str).drop_duplicates().tolist()
+            if test_ids:
+                chosen_test = st.selectbox(
+                    "Routing test case", test_ids, key="routing_test_case"
+                )
+                rr = routing[routing["test_id"].astype(str) == chosen_test].iloc[0]
+            else:
+                rr = None
+        else:
+            rr = routing.iloc[0]
+
+        if rr is not None:
+            route_fields = [
+                "expected_priority", "actual_priority", "urgency",
+                "expected_department", "actual_department",
+                "routing_reason", "both_correct",
+            ]
+            existing = [field for field in route_fields if field in rr.index]
+            cols = st.columns(3)
+            for i, field in enumerate(existing):
+                with cols[i % 3]:
+                    display_field(rr, field)
+
+    st.divider()
+    st.markdown("### Knowledge Base & AI Draft")
+    st.caption("Tham khảo kiến thức truy xuất và rà soát nội dung AI đề xuất.")
+
+    draft_default = ""
+    full_faq_answer = ""
+    original_ai_draft = ""
+    chosen_faq_id = ""
+    chosen_rag = "no_rag"
+    rrow = None
+
+    if rag.empty:
+        st.info("Chưa có file RAG test.")
+    else:
+        if "test_id" in rag.columns:
+            rag_ids = rag["test_id"].dropna().astype(str).drop_duplicates().tolist()
+            if rag_ids:
+                chosen_rag = st.selectbox("RAG test case", rag_ids, key="rag_test_case")
+                rrow = rag[rag["test_id"].astype(str) == chosen_rag].iloc[0]
+        else:
+            rrow = rag.iloc[0]
+
+    if rrow is not None:
+        st.markdown("#### Retrieved Knowledge")
+        kb_left, kb_right = st.columns(2)
+        with kb_left:
+            for field in ["actual_kb_found", "actual_source", "actual_confidence"]:
+                if field in rrow.index:
+                    display_field(rrow, field)
+        with kb_right:
+            for field in ["actual_reason", "expected_faq_source", "test_result"]:
+                if field in rrow.index:
+                    display_field(rrow, field)
+
+        # Display the full FAQ only when the RAG result says knowledge was found.
+        # Never present an expected FAQ as if it had actually been retrieved.
+        kb_found_value = safe_text(rrow.get("actual_kb_found", "false"), "false").strip().lower()
+        actual_kb_found = kb_found_value in {"true", "1", "yes", "y", "found"}
+        # Try the actual RAG source first, then the expected source as a fallback.
+        # Workbooks may store FAQ IDs, source labels, or FAQ names.
+        source_candidates = []
+        for source_field in ("actual_source", "expected_faq_source"):
+            value = safe_text(rrow.get(source_field, ""), "").strip()
+            if value and value.casefold() not in {"—", "n/a", "none", "nan"}:
+                if value not in source_candidates:
+                    source_candidates.append(value)
+        source_value = source_candidates[0] if source_candidates else ""
+
+        if not actual_kb_found:
+            st.info(
+                "RAG test này không tìm thấy FAQ thực tế. Hệ thống không hiển thị FAQ dự kiến "
+                "như thể đó là nguồn đã truy xuất; trường hợp này cần chuyển nhân viên xem xét."
+            )
+        elif not faq.empty:
+            faq_id_col = next((c for c in ["faq_id", "id"] if c in faq.columns), None)
+            faq_source_col = next((c for c in ["source", "faq_id", "id"] if c in faq.columns), None)
+            question_col = next((c for c in ["question", "faq_question", "title"] if c in faq.columns), None)
+            answer_col = next((c for c in ["answer", "faq_answer", "content", "response"] if c in faq.columns), None)
+
+            # Match both actual_source and expected_faq_source. RAG exports can
+            # store a label in actual_source rather than the FAQ ID itself.
+            import re
+            faq_match = pd.DataFrame()
+            for candidate in source_candidates:
+                source_ids = re.findall(r"FAQ\\s*[-_ ]?\\d+", candidate, flags=re.IGNORECASE)
+                source_ids = [
+                    re.sub(r"\\s+", "", x).replace("-", "").replace("_", "").upper()
+                    for x in source_ids
+                ]
+                if faq_id_col and source_ids:
+                    faq_keys = (
+                        faq[faq_id_col].astype(str).str.strip().str.upper()
+                        .str.replace(r"[-_ ]", "", regex=True)
+                    )
+                    faq_match = faq[faq_keys.isin(source_ids)]
+                if faq_match.empty and faq_id_col:
+                    normalized_candidate = re.sub(r"[-_ ]", "", candidate).strip().casefold()
+                    faq_keys = (
+                        faq[faq_id_col].astype(str).str.strip()
+                        .str.replace(r"[-_ ]", "", regex=True).str.casefold()
+                    )
+                    faq_match = faq[faq_keys == normalized_candidate]
+                if faq_match.empty and faq_source_col:
+                    faq_match = faq[
+                        faq[faq_source_col].astype(str).str.strip().str.casefold()
+                        == candidate.strip().casefold()
+                    ]
+                if faq_match.empty and question_col:
+                    faq_match = faq[
+                        faq[question_col].astype(str).str.strip().str.casefold()
+                        == candidate.strip().casefold()
+                    ]
+                if not faq_match.empty:
+                    source_value = candidate
+                    break
+
+            if not faq_match.empty:
+                st.markdown("#### Full FAQ Content")
+                # Keep the original FAQ answer intact. Use it as the response default
+                # so the full approved knowledge text is not lost in the shorter RAG draft.
+                first_faq_row = faq_match.iloc[0]
+                chosen_faq_id = safe_text(first_faq_row.get(faq_id_col, "FAQ"), "FAQ") if faq_id_col else "FAQ"
+                if answer_col:
+                    full_faq_answer = safe_text(first_faq_row.get(answer_col), "")
+                for _, faq_row in faq_match.iterrows():
+                    title = safe_text(faq_row.get(faq_id_col, "FAQ"), "FAQ") if faq_id_col else "FAQ"
+                    with st.expander(f"{title} — xem nội dung đầy đủ", expanded=True):
+                        if "category" in faq_row.index:
+                            st.caption(f"Category: {safe_text(faq_row.get('category'))}")
+                        if question_col:
+                            st.markdown("**Câu hỏi trong FAQ**")
+                            st.write(safe_text(faq_row.get(question_col), "Không có nội dung câu hỏi."))
+                        if answer_col:
+                            st.markdown("**Câu trả lời đầy đủ trong FAQ**")
+                            st.text(safe_text(faq_row.get(answer_col), "Không có nội dung câu trả lời."))
+                        if "last_updated" in faq_row.index:
+                            st.caption(f"Cập nhật lần cuối: {safe_text(faq_row.get('last_updated'))}")
+            else:
+                st.info(
+                    "Chưa tìm được bản FAQ đầy đủ tương ứng với source của test case này. "
+                    "Hãy kiểm tra giá trị actual_source/expected_faq_source và cột faq_id trong faq.xlsx."
+                )
+        else:
+            st.warning(
+                "Ứng dụng chưa tìm thấy file faq.xlsx nên chỉ hiển thị được mã nguồn FAQ. "
+                "Hãy đặt faq.xlsx cạnh dashboard.py hoặc trong thư mục data."
+            )
+
+        original_ai_draft = safe_text(rrow.get("actual_draft_response", ""), "")
+        # Prefer the full answer from the matched FAQ as the editable response text.
+        # Keep the shorter RAG-generated draft visible below for comparison.
+        draft_default = full_faq_answer if full_faq_answer.strip() else original_ai_draft
+
+    if original_ai_draft.strip() and full_faq_answer.strip() and original_ai_draft.strip() != full_faq_answer.strip():
+        with st.expander("Xem bản nháp AI ban đầu để đối chiếu"):
+            st.text(original_ai_draft)
+
+    st.markdown("#### AI Response Draft")
+    if full_faq_answer.strip():
+        st.success(f"Đã nạp toàn bộ câu trả lời từ {chosen_faq_id} vào ô phản hồi. Bạn có thể chỉnh sửa trước khi duyệt.")
+    draft_key = f"draft_v3_{chosen_rag}"
+    # Streamlit preserves widget state across reruns. Refresh the draft when the
+    # selected ticket/FAQ changes, but do not overwrite edits during later reruns.
+    draft_loaded_key = f"{draft_key}_loaded_faq_marker"
+    draft_loaded_marker = f"{chosen_rag}::{chosen_faq_id}::{full_faq_answer}"
+    if draft_key not in st.session_state or (
+        full_faq_answer.strip()
+        and st.session_state.get(draft_loaded_key) != draft_loaded_marker
+    ):
+        st.session_state[draft_key] = draft_default
+    st.session_state[draft_loaded_key] = draft_loaded_marker
+    edited_draft = st.text_area(
+        "Review and edit the response before approval",
+        key=draft_key,
+        height=180,
+        placeholder="Bản nháp phản hồi sẽ xuất hiện tại đây nếu có trong dữ liệu.",
+    )
+    st.caption(
+        "Ô phản hồi được nạp trực tiếp từ cột answer của FAQ đã khớp, không dùng bản nháp RAG "
+        "để thay thế nội dung FAQ. Nếu không khớp được FAQ, ứng dụng sẽ giữ bản nháp RAG và báo rõ "
+        "để nhân viên kiểm tra. Nội dung chỉ được lưu trong phiên làm việc; ứng dụng không tự gửi "
+        "phản hồi cho khách hàng."
+    )
+    if full_faq_answer.strip():
+        st.download_button(
+            "⬇️ Tải câu trả lời FAQ đầy đủ (.txt)",
+            data=full_faq_answer.encode("utf-8-sig"),
             file_name=f"{chosen_faq_id.replace(' ', '_')}_full_answer.txt",
             mime="text/plain",
             key=f"download_full_faq_{chosen_rag}",
@@ -801,6 +1053,7 @@ elif page == "Ticket Management":
         "Trạng thái review hiện được lưu trong session của ứng dụng. "
         "Muốn lưu lâu dài hoặc chia sẻ giữa nhiều nhân viên, cần kết nối database."
     )
+
 
 # =========================================================
 # PAGE 4: MANAGEMENT ANALYTICS
