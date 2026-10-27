@@ -15,13 +15,31 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIRS = [BASE_DIR, BASE_DIR / "data", BASE_DIR.parent / "data"]
+# Support both layouts:
+#   project/app/dashboard/dashboard.py + project/data/*.xlsx
+#   project/dashboard.py + project/data/*.xlsx
+DATA_DIRS = [
+    BASE_DIR,
+    BASE_DIR / "data",
+    BASE_DIR.parent / "data",
+    BASE_DIR.parent.parent / "data",
+]
 
 FILES = {
     "tickets": ["tickets.xlsx", "tickets(3).xlsx"],
     "analysis": ["tickets_analyzed.xlsx", "classified_feedback.xlsx"],
-    "routing": ["test_routing.xlsx", "test_routing_results.xlsx"],
-    "rag": ["test_rag.xlsx", "rag_results.xlsx"],
+    "routing": [
+        "priority_routing_output.xlsx", "test_routing.xlsx",
+        "test_routing (2).xlsx", "test_routing_results.xlsx",
+    ],
+    "rag": [
+        "test_rag.xlsx", "test_rag (2).xlsx", "rag_results.xlsx",
+        "rag_output.xlsx",
+    ],
+    "faq": [
+        "faq.xlsx", "FAQ.xlsx", "faq_bank.xlsx", "knowledge_base.xlsx",
+        "knowledge_base_output.xlsx",
+    ],
     "classified": [
         "Copy of classified_feedback.xlsx",
         "classified_feedback.xlsx",
@@ -150,12 +168,25 @@ def read_excel(path_string, modified_time):
     return pd.read_excel(path_string)
 
 
+def normalize_column_names(frame):
+    """Normalize header casing/spacing while preserving the original data."""
+    if frame.empty:
+        return frame
+    result = frame.copy()
+    result.columns = [
+        str(column).replace("\ufeff", "").strip().lower().replace(" ", "_")
+        for column in result.columns
+    ]
+    return result
+
+
 def load_table(key):
     path = find_file(FILES[key])
     if path is None:
         return pd.DataFrame(), None
     try:
-        return read_excel(str(path), path.stat().st_mtime), path
+        frame = read_excel(str(path), path.stat().st_mtime)
+        return normalize_column_names(frame), path
     except Exception as exc:
         st.warning(f"Không đọc được file {path.name}: {exc}")
         return pd.DataFrame(), path
@@ -165,8 +196,17 @@ tickets, tickets_path = load_table("tickets")
 analysis, analysis_path = load_table("analysis")
 routing, routing_path = load_table("routing")
 rag, rag_path = load_table("rag")
+faq, faq_path = load_table("faq")
 classified, classified_path = load_table("classified")
 management_report_path = find_file(FILES["management_report"])
+
+# If the raw ticket workbook is absent, use the most complete available
+# classified/analysis workbook so the dashboard can still open for review.
+if tickets.empty:
+    fallback = classified if not classified.empty else analysis
+    if not fallback.empty and "ticket_id" in fallback.columns:
+        tickets = fallback.copy()
+        tickets_path = classified_path if not classified.empty else analysis_path
 
 
 def read_management_report(path):
@@ -376,6 +416,7 @@ with st.sidebar:
         ("AI Analysis", analysis, analysis_path),
         ("Routing tests", routing, routing_path),
         ("RAG tests", rag, rag_path),
+        ("FAQ Knowledge Base", faq, faq_path),
         ("Classified data", classified, classified_path),
     ]:
         if path:
@@ -755,6 +796,9 @@ elif page == "AI Analysis & Review":
     st.caption("Tham khảo kiến thức truy xuất và rà soát nội dung AI đề xuất.")
 
     draft_default = ""
+    full_faq_answer = ""
+    original_ai_draft = ""
+    chosen_faq_id = ""
     chosen_rag = "no_rag"
     rrow = None
 
@@ -781,9 +825,80 @@ elif page == "AI Analysis & Review":
                 if field in rrow.index:
                     display_field(rrow, field)
 
-        draft_default = safe_text(rrow.get("actual_draft_response", ""), "")
+        # Display the full FAQ only when the RAG result says knowledge was found.
+        # Never present an expected FAQ as if it had actually been retrieved.
+        kb_found_value = safe_text(rrow.get("actual_kb_found", "false"), "false").strip().lower()
+        actual_kb_found = kb_found_value in {"true", "1", "yes", "y", "found"}
+        source_value = safe_text(rrow.get("actual_source", ""), "")
+        if not source_value or source_value in ("—", "N/A", "None", "nan"):
+            source_value = safe_text(rrow.get("expected_faq_source", ""), "") if actual_kb_found else ""
+
+        if not actual_kb_found:
+            st.info(
+                "RAG test này không tìm thấy FAQ thực tế. Hệ thống không hiển thị FAQ dự kiến "
+                "như thể đó là nguồn đã truy xuất; trường hợp này cần chuyển nhân viên xem xét."
+            )
+        elif not faq.empty:
+            faq_id_col = next((c for c in ["faq_id", "id"] if c in faq.columns), None)
+            faq_source_col = next((c for c in ["source", "faq_id", "id"] if c in faq.columns), None)
+            question_col = next((c for c in ["question", "faq_question", "title"] if c in faq.columns), None)
+            answer_col = next((c for c in ["answer", "faq_answer", "content", "response"] if c in faq.columns), None)
+
+            # Some RAG outputs contain source labels such as "FAQ01" or text around the ID.
+            import re
+            source_ids = re.findall(r"FAQ\s*[-_ ]?\d+", source_value, flags=re.IGNORECASE)
+            source_ids = [re.sub(r"\s+", "", x).replace("-", "").replace("_", "").upper() for x in source_ids]
+            faq_match = pd.DataFrame()
+            if faq_id_col and source_ids:
+                faq_keys = faq[faq_id_col].astype(str).str.strip().str.upper().str.replace(r"[-_ ]", "", regex=True)
+                faq_match = faq[faq_keys.isin(source_ids)]
+            elif faq_source_col and source_value:
+                faq_match = faq[faq[faq_source_col].astype(str).str.strip().str.casefold() == source_value.strip().casefold()]
+
+            if not faq_match.empty:
+                st.markdown("#### Full FAQ Content")
+                # Keep the original FAQ answer intact. Use it as the response default
+                # so the full approved knowledge text is not lost in the shorter RAG draft.
+                first_faq_row = faq_match.iloc[0]
+                chosen_faq_id = safe_text(first_faq_row.get(faq_id_col, "FAQ"), "FAQ") if faq_id_col else "FAQ"
+                if answer_col:
+                    full_faq_answer = safe_text(first_faq_row.get(answer_col), "")
+                for _, faq_row in faq_match.iterrows():
+                    title = safe_text(faq_row.get(faq_id_col, "FAQ"), "FAQ") if faq_id_col else "FAQ"
+                    with st.expander(f"{title} — xem nội dung đầy đủ", expanded=True):
+                        if "category" in faq_row.index:
+                            st.caption(f"Category: {safe_text(faq_row.get('category'))}")
+                        if question_col:
+                            st.markdown("**Câu hỏi trong FAQ**")
+                            st.write(safe_text(faq_row.get(question_col), "Không có nội dung câu hỏi."))
+                        if answer_col:
+                            st.markdown("**Câu trả lời đầy đủ trong FAQ**")
+                            st.text(safe_text(faq_row.get(answer_col), "Không có nội dung câu trả lời."))
+                        if "last_updated" in faq_row.index:
+                            st.caption(f"Cập nhật lần cuối: {safe_text(faq_row.get('last_updated'))}")
+            else:
+                st.info(
+                    "Chưa tìm được bản FAQ đầy đủ tương ứng với source của test case này. "
+                    "Hãy kiểm tra giá trị actual_source/expected_faq_source và cột faq_id trong faq.xlsx."
+                )
+        else:
+            st.warning(
+                "Ứng dụng chưa tìm thấy file faq.xlsx nên chỉ hiển thị được mã nguồn FAQ. "
+                "Hãy đặt faq.xlsx cạnh dashboard.py hoặc trong thư mục data."
+            )
+
+        original_ai_draft = safe_text(rrow.get("actual_draft_response", ""), "")
+        # Prefer the full answer from the matched FAQ as the editable response text.
+        # Keep the shorter RAG-generated draft visible below for comparison.
+        draft_default = full_faq_answer if full_faq_answer.strip() else original_ai_draft
+
+    if original_ai_draft.strip() and full_faq_answer.strip() and original_ai_draft.strip() != full_faq_answer.strip():
+        with st.expander("Xem bản nháp AI ban đầu để đối chiếu"):
+            st.text(original_ai_draft)
 
     st.markdown("#### AI Response Draft")
+    if full_faq_answer.strip():
+        st.success(f"Đã nạp toàn bộ câu trả lời từ {chosen_faq_id} vào ô phản hồi. Bạn có thể chỉnh sửa trước khi duyệt.")
     draft_key = f"draft_{chosen_rag}"
     if draft_key not in st.session_state:
         st.session_state[draft_key] = draft_default
@@ -794,9 +909,74 @@ elif page == "AI Analysis & Review":
         placeholder="Bản nháp phản hồi sẽ xuất hiện tại đây nếu có trong dữ liệu.",
     )
     st.caption(
-        "Bản nháp trong phiên này lấy từ file RAG test. "
+        "Nếu RAG truy xuất được FAQ, ô phản hồi sẽ ưu tiên toàn bộ câu trả lời nguyên văn từ faq.xlsx; "
+        "nếu không tìm được FAQ thì dùng bản nháp có sẵn trong file RAG. "
         "Ứng dụng chưa kết nối API gửi phản hồi và không tự động gửi cho khách hàng."
     )
+    if full_faq_answer.strip():
+        st.download_button(
+            "⬇️ Tải câu trả lời FAQ đầy đủ (.txt)",
+            data=full_faq_answer.encode("utf-8-sig"),
+            file_name=f"{chosen_faq_id.replace(' ', '_')}_full_answer.txt",
+            mime="text/plain",
+            key=f"download_full_faq_{chosen_rag}",
+        )
+
+    # Keep the existing dashboard and add a complete, searchable FAQ reference.
+    # This remains available even when the selected RAG test did not retrieve a FAQ.
+    st.divider()
+    st.markdown("### 📚 FAQ Library — Full Questions & Answers")
+    st.caption(
+        "Tra cứu nguyên văn nội dung trong faq.xlsx. Phần này chỉ hiển thị kiến thức "
+        "đã có trong file FAQ; không tự bổ sung lãi suất, phí, tỷ giá hoặc chính sách ngoài KB."
+    )
+
+    if faq.empty:
+        st.warning(
+            "Chưa tìm thấy file faq.xlsx. Hãy đặt faq.xlsx trong thư mục data của dự án "
+            "để hiển thị đầy đủ câu hỏi và câu trả lời."
+        )
+    else:
+        faq_id_col = next((c for c in ["faq_id", "id"] if c in faq.columns), None)
+        faq_category_col = next((c for c in ["category", "topic"] if c in faq.columns), None)
+        faq_question_col = next((c for c in ["question", "faq_question", "title"] if c in faq.columns), None)
+        faq_answer_col = next((c for c in ["answer", "faq_answer", "content", "response"] if c in faq.columns), None)
+        faq_source_col = next((c for c in ["source", "reference"] if c in faq.columns), None)
+
+        if faq_question_col is None or faq_answer_col is None:
+            st.warning(
+                "File FAQ chưa có đủ cột question và answer. "
+                f"Các cột hiện có: {', '.join(map(str, faq.columns))}"
+            )
+        else:
+            search_faq = st.text_input(
+                "Tìm FAQ theo mã, chủ đề, câu hỏi hoặc câu trả lời",
+                placeholder="Ví dụ: FAQ21, chuyển khoản, khóa thẻ...",
+                key="faq_library_search",
+            ).strip().casefold()
+            faq_view = faq.copy()
+            searchable_cols = [c for c in [faq_id_col, faq_category_col, faq_question_col, faq_answer_col, faq_source_col] if c]
+            if search_faq:
+                mask = faq_view[searchable_cols].fillna("").astype(str).apply(
+                    lambda col: col.str.casefold().str.contains(search_faq, regex=False)
+                ).any(axis=1)
+                faq_view = faq_view[mask]
+
+            st.caption(f"Hiển thị {len(faq_view)} / {len(faq)} FAQ")
+            for idx, faq_item in faq_view.iterrows():
+                faq_code = safe_text(faq_item.get(faq_id_col, f"FAQ {idx + 1}"), f"FAQ {idx + 1}") if faq_id_col else f"FAQ {idx + 1}"
+                faq_question = safe_text(faq_item.get(faq_question_col), "Chưa có nội dung câu hỏi")
+                with st.expander(f"{faq_code} — {faq_question}"):
+                    if faq_category_col:
+                        st.caption(f"Chủ đề: {safe_text(faq_item.get(faq_category_col))}")
+                    st.markdown("**Câu hỏi**")
+                    st.write(faq_question)
+                    st.markdown("**Câu trả lời đầy đủ theo FAQ**")
+                    st.text(safe_text(faq_item.get(faq_answer_col), "Chưa có nội dung câu trả lời"))
+                    if faq_source_col:
+                        st.caption(f"Nguồn: {safe_text(faq_item.get(faq_source_col))}")
+                    if "last_updated" in faq_item.index:
+                        st.caption(f"Cập nhật lần cuối: {safe_text(faq_item.get('last_updated'))}")
 
     st.divider()
     st.markdown("### Human Review")
@@ -1029,6 +1209,11 @@ elif page == "Management Analytics":
     else:
         st.info("Cần có hai cột created_at và category để phân tích xu hướng.")
 
+    if management_report_text.strip():
+        with st.expander("View management summary note"):
+            st.markdown(management_report_text)
+
+
 # =========================================================
 # PAGE 5: CLASSIFIED OUTPUT
 # =========================================================
@@ -1095,9 +1280,30 @@ elif page == "Classified Output":
     )
     st.caption(
         "Classified Output giữ nguyên các trường phân tích, bao gồm cluster_label "
-        "nếu trường này tồn tại trong nguồn dữ liệu. Chức năng tải xuống hiện không "
-        "được hiển thị trên giao diện."
+        "nếu trường này tồn tại trong nguồn dữ liệu. File tải xuống chỉ chứa các dòng "
+        "đang khớp với bộ lọc hiện tại. Hãy chia sẻ dữ liệu theo đúng quyền truy cập."
     )
+    download_col1, download_col2 = st.columns(2)
+    with download_col1:
+        csv_bytes = filtered.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "⬇️ Download CSV",
+            data=csv_bytes,
+            file_name="classified_output.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with download_col2:
+        excel_buffer = BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            filtered.to_excel(writer, index=False, sheet_name="Classified_Output")
+        st.download_button(
+            "⬇️ Download Excel",
+            data=excel_buffer.getvalue(),
+            file_name="classified_output.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 # =========================================================
 # FOOTER
